@@ -217,8 +217,9 @@ table.data tr:nth-child(even) td { background: #f8fafd; }
 table.data tr:last-child.sum td { background: #eef2fa; font-weight: 600; }
 .table-cap { text-align: center; color: var(--muted); font-size: 13px; margin: 4px 0 0; }
 .tbl-empty { color: var(--muted); font-size: 13.5px; padding: 14px; text-align: center; border: 1.5px dashed var(--line); border-radius: 10px; }
-.two-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; align-items: start; }
-@media (max-width: 960px) { .two-tables { grid-template-columns: 1fr; } }
+.two-tables { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 18px; align-items: start; }
+.two-tables > * { min-width: 0; }
+@media (max-width: 960px) { .two-tables { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- results summary ---------- */
 .result-box {
@@ -318,7 +319,7 @@ progress.progress::-moz-progress-bar { background: var(--acc); border-radius: 5p
   /* эксперимент: канвас во всю ширину, управление сразу под ним, таблицы ниже */
   .practice { flex-direction: column; gap: 10px; }
   .practice .sim-col { display: contents; }
-  .practice .ctrl-col { min-width: 0; max-width: none; }
+  .practice .ctrl-col { min-width: 0; max-width: none; order: 2; }
   .sim-frame { order: 1; border-radius: 10px; }
   .sim-col > *:not(.sim-frame) { order: 3; margin-top: 10px; }
   .sim-status { font-size: 12px; padding: 6px 9px; gap: 7px; }
