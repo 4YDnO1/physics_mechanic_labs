@@ -1,5 +1,6 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
+import Subst from '../../components/Subst.jsx'
 import { G, fmt, mean, meanAbsDev } from '../../utils/stats.js'
 import { LIQUIDS } from './content.jsx'
 
@@ -52,6 +53,14 @@ function GroupResult({ g }) {
         <Tex>{String.raw`\Delta\eta = ${fmt(g.dEta, 3)}`}</Tex> Па·с; относительная погрешность δ ={' '}
         {fmt(g.rel, 1)} %.
       </div>
+      <Eq>{String.raw`\eta_{\text{ср}} = \frac{1}{N}\sum_{i=1}^{N}\eta_i = \frac{${g.rows.map((r) => fmt(r.eta, 3)).join(' + ')}}{${g.n}} = ${fmt(g.etaM, 3)}\ \text{Па·с}`}</Eq>
+      <p className="small dim">Отклонения опытов серии от среднего:</p>
+      <Subst
+        items={g.rows.map((r, i) =>
+          String.raw`\left|\eta_{${i + 1}} - \eta_{\text{ср}}\right| = \left|${fmt(r.eta, 3)} - ${fmt(g.etaM, 3)}\right| = ${fmt(Math.abs(r.eta - g.etaM), 3)}\ \text{Па·с}`
+        )}
+      />
+      <Eq>{String.raw`\Delta\eta = \frac{1}{N}\sum_{i=1}^{N}\left|\eta_i - \eta_{\text{ср}}\right| = \frac{${g.rows.map((r) => fmt(Math.abs(r.eta - g.etaM), 3)).join(' + ')}}{${g.n}} = ${fmt(g.dEta, 3)}\ \text{Па·с}`}</Eq>
     </div>
   )
 }
@@ -84,6 +93,12 @@ function LiqCalc({ liq }) {
           { key: 'eta', label: 'η', unit: 'Па·с', format: (v) => fmt(v, 3) },
         ]}
         caption={`Расчёт по формуле (10): η = 2r²g(ρш − ρж)t / (9l)`}
+      />
+      <h4>Подстановка значений по опытам</h4>
+      <Subst
+        items={sub.map((r, i) =>
+          String.raw`\eta_{${i + 1}} = \frac{2r^2g(\rho_{\text{ш}} - \rho_{\text{ж}})\,t_{${i + 1}}}{9l} = \frac{2\cdot ${fmt(r.r, 3)}^2\cdot 9{,}81\cdot(${fmt(r.rhoS, 0)} - ${fmt(r.rhoL, 0)})\cdot ${fmt(r.t, 2)}}{9\cdot ${fmt(r.l, 2)}} = ${fmt(r.eta, 3)}\ \text{Па·с}`
+        )}
       />
       <p>
         Средние значения и погрешности вычисляются <b>отдельно для каждого материала шарика</b>{' '}

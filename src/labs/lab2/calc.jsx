@@ -1,5 +1,6 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
+import Subst from '../../components/Subst.jsx'
 import { G, fmt, mean } from '../../utils/stats.js'
 import { L } from './content.jsx'
 
@@ -34,6 +35,28 @@ export default function Lab2Calc({ rows }) {
   const st = computeStats(rows)
   const elast = st.calc.filter((c) => c.mode === 'elastic')
   const inel = st.calc.filter((c) => c.mode === 'inelastic')
+
+  const substTex = (r) => {
+    const v1 = String.raw`v_{1} &= 2\sqrt{gl}\,\sin\frac{\alpha_1}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.a1, 1)}^\circ}{2} = ${fmt(r.v1, 2)}\ \text{м/с}`
+    const pd = String.raw`p_{\text{до}} &= m_1 v_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.v1, 2)} = ${fmt(r.pb, 3)}\ \text{кг·м/с}`
+    if (r.mode === 'elastic') {
+      return String.raw`\begin{aligned}
+${v1}\\
+u_{1} &= 2\sqrt{gl}\,\sin\frac{|\alpha_1'|}{2} = ${fmt(K, 2)}\sin\frac{${fmt(Math.abs(r.a1p), 1)}^\circ}{2} = ${fmt(r.u1, 2)}\ \text{м/с}\\
+u_{2} &= 2\sqrt{gl}\,\sin\frac{\alpha_2'}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.a2p, 1)}^\circ}{2} = ${fmt(r.u2, 2)}\ \text{м/с}\\
+${pd}\\
+p_{\text{после}} &= m_1 u_1 + m_2 u_2 = ${fmt(r.m1, 2)}\cdot ${fmt(r.u1, 2)} + ${fmt(r.m2, 2)}\cdot ${fmt(r.u2, 2)} = ${fmt(r.pa, 3)}\ \text{кг·м/с}\\
+\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%
+\end{aligned}`
+    }
+    return String.raw`\begin{aligned}
+${v1}\\
+u &= 2\sqrt{gl}\,\sin\frac{\alpha'}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.ap, 1)}^\circ}{2} = ${fmt(r.u, 2)}\ \text{м/с}\\
+${pd}\\
+p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot ${fmt(r.u, 2)} = ${fmt(r.pa, 3)}\ \text{кг·м/с}\\
+\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%
+\end{aligned}`
+  }
 
   return (
     <>
@@ -73,9 +96,8 @@ export default function Lab2Calc({ rows }) {
               { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
             ]}
           />
-          <p className="small dim">
-            Среднее отклонение импульса при упругом ударе: <b>{fmt(st.elast.davg, 1)} %</b>.
-          </p>
+          <p>Среднее отклонение импульса по опытам:</p>
+          <Eq>{String.raw`\overline{\Delta p} = \frac{1}{N}\sum_{i=1}^{N}\Delta p_i = \frac{${elast.map((r) => fmt(r.dp, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.davg, 1)}\%`}</Eq>
         </>
       )}
 
@@ -97,9 +119,19 @@ export default function Lab2Calc({ rows }) {
               { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
             ]}
           />
-          <p className="small dim">
-            Среднее отклонение импульса при неупругом ударе: <b>{fmt(st.inel.davg, 1)} %</b>.
+          <p>Среднее отклонение импульса по опытам:</p>
+          <Eq>{String.raw`\overline{\Delta p} = \frac{1}{N}\sum_{i=1}^{N}\Delta p_i = \frac{${inel.map((r) => fmt(r.dp, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.davg, 1)}\%`}</Eq>
+        </>
+      )}
+
+      {st.calc.length > 0 && (
+        <>
+          <h4>Подстановка значений по опытам</h4>
+          <p>
+            Для каждого опыта вычисляются скорости шаров, импульс до и после удара и относительное
+            отклонение импульса:
           </p>
+          <Subst items={st.calc.map((r) => substTex(r))} />
         </>
       )}
 

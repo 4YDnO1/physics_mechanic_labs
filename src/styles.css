@@ -135,6 +135,13 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 
+.subst { list-style: none; padding: 0; margin: 12px 0; max-width: 900px; }
+.subst li {
+  border-left: 3px solid var(--acc-soft); background: #f8fafd;
+  border-radius: 0 8px 8px 0; padding: 4px 10px; margin: 6px 0;
+}
+.subst li .katex-display { margin: 0; }
+
 .note {
   background: var(--acc-soft); border-left: 4px solid var(--acc);
   border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 14px 0;

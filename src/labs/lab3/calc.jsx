@@ -1,6 +1,7 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
 import Plot from '../../components/Plot.jsx'
+import Subst from '../../components/Subst.jsx'
 import { G, fmt, mean, meanAbsDev } from '../../utils/stats.js'
 
 export function computeStats(rows) {
@@ -64,6 +65,21 @@ export default function Lab3Calc({ rows }) {
             caption={`h = ${fmt(rows[0].h, 2)} м; r = ${fmt(rows[0].r, 3)} м; Jz(теор) = ${fmt(st.JzTheory, 4)} кг·м²`}
           />
 
+          <h4>Подстановка значений по опытам</h4>
+          <p>
+            Для каждого опыта последовательно вычисляются угловое ускорение ε, момент силы M<sub>z</sub>{' '}
+            и момент инерции J<sub>z</sub>:
+          </p>
+          <Subst
+            items={st.calc.map((r) =>
+              String.raw`\begin{aligned}
+\varepsilon_{${r.i}} &= \frac{2h}{r\,t_{${r.i}}^2} = \frac{2\cdot ${fmt(r.h, 2)}}{${fmt(r.r, 3)}\cdot ${fmt(r.t, 2)}^2} = ${fmt(r.eps, 2)}\ \text{рад/с}^2\\
+M_{z${r.i}} &= m_{${r.i}}r\left(g - \frac{2h}{t_{${r.i}}^2}\right) = ${fmt(r.m, 2)}\cdot ${fmt(r.r, 3)}\left(9{,}81 - \frac{2\cdot ${fmt(r.h, 2)}}{${fmt(r.t, 2)}^2}\right) = ${fmt(r.Mz, 4)}\ \text{Н·м}\\
+J_{z${r.i}} &= \frac{M_{z${r.i}}}{\varepsilon_{${r.i}}} = \frac{${fmt(r.Mz, 4)}}{${fmt(r.eps, 2)}} = ${fmt(r.Jz, 4)}\ \text{кг·м}^2
+\end{aligned}`
+            )}
+          />
+
           {graphRows.length >= 2 && (
             <>
               <h4>График зависимости ε = f(M<sub>z</sub>)</h4>
@@ -94,9 +110,22 @@ export default function Lab3Calc({ rows }) {
                 <Tex>{String.raw`m`}</Tex>) вычисляются средние значения и средние абсолютные
                 погрешности:
               </p>
-              <Eq>{String.raw`\varepsilon_{\text{ср}} = ${fmt(st.epsM, 2)}\ \text{рад/с}^2, \qquad \Delta\varepsilon = ${fmt(st.dEps, 2)}\ \text{рад/с}^2, \qquad \delta_\varepsilon = ${fmt((st.dEps / st.epsM) * 100, 1)}\%`}</Eq>
-              <Eq>{String.raw`M_{z\,\text{ср}} = ${fmt(st.MzM, 4)}\ \text{Н·м}, \qquad \Delta M_z = ${fmt(st.dMz, 4)}\ \text{Н·м}, \qquad \delta_{M_z} = ${fmt((st.dMz / st.MzM) * 100, 1)}\%`}</Eq>
-              <Eq>{String.raw`J_{z\,\text{ср}} = ${fmt(st.JzM, 4)}\ \text{кг·м}^2, \qquad \Delta J_z = ${fmt(st.dJz, 4)}\ \text{кг·м}^2, \qquad \delta_{J_z} = ${fmt(st.rel, 1)}\%`}</Eq>
+              <Eq>{String.raw`\varepsilon_{\text{ср}} = \frac{1}{N}\sum_{i=1}^{N}\varepsilon_i = \frac{${st.calc.slice(-3).map((r) => fmt(r.eps, 2)).join(' + ')}}{3} = ${fmt(st.epsM, 2)}\ \text{рад/с}^2`}</Eq>
+              <Eq>{String.raw`M_{z\,\text{ср}} = \frac{1}{N}\sum_{i=1}^{N} M_{zi} = \frac{${st.calc.slice(-3).map((r) => fmt(r.Mz, 4)).join(' + ')}}{3} = ${fmt(st.MzM, 4)}\ \text{Н·м}`}</Eq>
+              <Eq>{String.raw`J_{z\,\text{ср}} = \frac{1}{N}\sum_{i=1}^{N} J_{zi} = \frac{${st.calc.slice(-3).map((r) => fmt(r.Jz, 4)).join(' + ')}}{3} = ${fmt(st.JzM, 4)}\ \text{кг·м}^2`}</Eq>
+              <p>Отклонения опытов от средних значений:</p>
+              <Subst
+                items={st.calc.slice(-3).map((r) =>
+                  String.raw`\begin{aligned}
+\left|\varepsilon_{${r.i}} - \varepsilon_{\text{ср}}\right| &= ${fmt(Math.abs(r.eps - st.epsM), 2)}\ \text{рад/с}^2\\
+\left|M_{z${r.i}} - M_{z\,\text{ср}}\right| &= ${fmt(Math.abs(r.Mz - st.MzM), 4)}\ \text{Н·м}\\
+\left|J_{z${r.i}} - J_{z\,\text{ср}}\right| &= ${fmt(Math.abs(r.Jz - st.JzM), 4)}\ \text{кг·м}^2
+\end{aligned}`
+                )}
+              />
+              <Eq>{String.raw`\Delta\varepsilon = \frac{${st.calc.slice(-3).map((r) => fmt(Math.abs(r.eps - st.epsM), 2)).join(' + ')}}{3} = ${fmt(st.dEps, 2)}\ \text{рад/с}^2, \qquad \delta_\varepsilon = ${fmt((st.dEps / st.epsM) * 100, 1)}\%`}</Eq>
+              <Eq>{String.raw`\Delta M_z = \frac{${st.calc.slice(-3).map((r) => fmt(Math.abs(r.Mz - st.MzM), 4)).join(' + ')}}{3} = ${fmt(st.dMz, 4)}\ \text{Н·м}, \qquad \delta_{M_z} = ${fmt((st.dMz / st.MzM) * 100, 1)}\%`}</Eq>
+              <Eq>{String.raw`\Delta J_z = \frac{${st.calc.slice(-3).map((r) => fmt(Math.abs(r.Jz - st.JzM), 4)).join(' + ')}}{3} = ${fmt(st.dJz, 4)}\ \text{кг·м}^2, \qquad \delta_{J_z} = ${fmt(st.rel, 1)}\%`}</Eq>
 
               <div className="result-box">
                 <div className="rb-main">

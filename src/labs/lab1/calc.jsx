@@ -1,5 +1,6 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
+import Subst from '../../components/Subst.jsx'
 import { G, fmt, mean, meanAbsDev } from '../../utils/stats.js'
 
 export function computeStats(rows) {
@@ -50,14 +51,25 @@ export default function Lab1Calc({ rows }) {
             caption={`Радиус шкива r = ${fmt(rows[0].r, 2)} м, высота падения h = ${fmt(rows[0].h, 2)} м`}
           />
 
+          <h4>Подстановка значений по опытам</h4>
+          <p>Вычисление момента инерции для каждого опыта по формуле (13):</p>
+          <Subst
+            items={calc.map((r, i) =>
+              String.raw`J_{${i + 1}} = \frac{${fmt(r.m, 2)}\cdot ${fmt(r.r, 2)}^2\cdot ${r.n2}\cdot\left(9{,}81\cdot ${fmt(r.t, 2)}^2 - 2\cdot ${fmt(r.h, 2)}\right)}{2\cdot ${fmt(r.h, 2)}\cdot\left(${r.n1}+${r.n2}\right)} = ${fmt(r.J, 4)}\ \text{кг·м}^2`
+            )}
+          />
+
           <h3>Расчёт погрешностей</h3>
           <p>Среднее значение момента инерции:</p>
-          <Eq>{String.raw`J_{\text{ср}} = \frac{1}{N}\sum_{i=1}^{N} J_i = ${fmt(st.Jm, 4)}\ \text{кг·м}^2`}</Eq>
-          <p>
-            Абсолютная погрешность — средняя абсолютная ошибка измерений (отклонение результатов
-            отдельных опытов от среднего):
-          </p>
-          <Eq>{String.raw`\Delta J = \frac{1}{N}\sum_{i=1}^{N}\left|J_i - J_{\text{ср}}\right| = ${fmt(st.dJ, 4)}\ \text{кг·м}^2`}</Eq>
+          <Eq>{String.raw`J_{\text{ср}} = \frac{1}{N}\sum_{i=1}^{N} J_i = \frac{${calc.map((r) => fmt(r.J, 4)).join(' + ')}}{${calc.length}} = ${fmt(st.Jm, 4)}\ \text{кг·м}^2`}</Eq>
+          <p>Отклонения результатов отдельных опытов от среднего:</p>
+          <Subst
+            items={calc.map((r, i) =>
+              String.raw`\left|J_{${i + 1}} - J_{\text{ср}}\right| = \left|${fmt(r.J, 4)} - ${fmt(st.Jm, 4)}\right| = ${fmt(Math.abs(r.J - st.Jm), 4)}\ \text{кг·м}^2`
+            )}
+          />
+          <p>Абсолютная погрешность — средняя абсолютная ошибка измерений:</p>
+          <Eq>{String.raw`\Delta J = \frac{1}{N}\sum_{i=1}^{N}\left|J_i - J_{\text{ср}}\right| = \frac{${calc.map((r) => fmt(Math.abs(r.J - st.Jm), 4)).join(' + ')}}{${calc.length}} = ${fmt(st.dJ, 4)}\ \text{кг·м}^2`}</Eq>
           <p>Относительная погрешность:</p>
           <Eq>{String.raw`\delta_J = \frac{\Delta J}{J_{\text{ср}}}\cdot 100\% = ${fmt(st.rel, 1)}\%`}</Eq>
 
