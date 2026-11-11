@@ -43,12 +43,14 @@ export default function Lab1Calc({ rows }) {
             columns={[
               { key: 'i', label: '№' },
               { key: 'm', label: 'm', unit: 'кг' },
+              { key: 'r', label: 'r', unit: 'м' },
+              { key: 'h', label: 'h', unit: 'м' },
               { key: 't', label: 't', unit: 'с' },
               { key: 'n1', label: 'n₁', unit: 'об' },
               { key: 'n2', label: 'n₂', unit: 'об' },
               { key: 'J', label: 'J', unit: 'кг·м²', format: (v) => fmt(v, 4) },
             ]}
-            caption={`Радиус шкива r = ${fmt(rows[0].r, 2)} м, высота падения h = ${fmt(rows[0].h, 2)} м`}
+            caption="Радиус шкива r и высота падения h берутся для каждого опыта (могут отличаться)"
           />
 
           <h4>Подстановка значений по опытам</h4>

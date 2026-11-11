@@ -132,15 +132,13 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
             columns={[
               { key: 'i', label: '№' },
               { key: 'm', label: 'm', unit: 'кг' },
+              { key: 'r', label: 'r', unit: 'м' },
+              { key: 'h', label: 'h', unit: 'м' },
               { key: 't', label: 't', unit: 'с' },
               { key: 'n1', label: 'n₁', unit: 'об' },
               { key: 'n2', label: 'n₂', unit: 'об' },
             ]}
-            caption={
-              rows.length
-                ? `Радиус шкива r = ${fmt(rows[0].r, 2)} м; высота падения груза h = ${fmt(rows[0].h, 2)} м`
-                : 'Таблица 1. Результаты измерений'
-            }
+            caption="Радиус шкива r, высота падения h и масса груза m задаются перед каждым опытом"
           />
         </div>
       </div>
