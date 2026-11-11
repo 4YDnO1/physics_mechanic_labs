@@ -161,7 +161,7 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
             <span>{statusText}</span>
           </div>
         </div>
-        <div className="two-tables" style={{ marginTop: 14 }}>
+        <div style={{ marginTop: 14 }}>
           <div>
             <h4>Таблица 1. Жидкость №1</h4>
             <DataTable

@@ -70,7 +70,7 @@ function LiqCalc({ liq }) {
   if (sub.length === 0) {
     return (
       <>
-        <h3>Жидкость №{liq.n}</h3>
+        <h3>Таблица {liq.n}. Жидкость №{liq.n}</h3>
         <div className="tbl-empty">
           Нет данных для жидкости №{liq.n}. Выполните измерения в соответствующем сосуде.
         </div>
@@ -79,7 +79,7 @@ function LiqCalc({ liq }) {
   }
   return (
     <>
-      <h3>Жидкость №{liq.n} (ρж = {fmt(liq.rho, 0)} кг/м³)</h3>
+      <h3>Таблица {liq.n}. Жидкость №{liq.n} (ρж = {fmt(liq.rho, 0)} кг/м³)</h3>
       <DataTable
         rows={sub.map((r, i) => ({ ...r, i: i + 1 }))}
         columns={[
@@ -141,10 +141,10 @@ export default function Lab5Calc({ rows }) {
       </p>
 
       {has ? (
-        <div className="two-tables">
-          <LiqCalc liq={{ n: 2, ...st.byLiq[2], rho: LIQUIDS[1].rho }} />
+        <>
           <LiqCalc liq={{ n: 1, ...st.byLiq[1], rho: LIQUIDS[0].rho }} />
-        </div>
+          <LiqCalc liq={{ n: 2, ...st.byLiq[2], rho: LIQUIDS[1].rho }} />
+        </>
       ) : (
         <div className="tbl-empty">Нет данных для расчёта. Выполните измерения на вкладке «Эксперимент».</div>
       )}
