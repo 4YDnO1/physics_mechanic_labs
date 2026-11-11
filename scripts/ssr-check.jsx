@@ -17,7 +17,7 @@ import Calc3, { computeStats as cs3 } from '../src/labs/lab3/calc.jsx'
 import Calc4, { computeStats as cs4 } from '../src/labs/lab4/calc.jsx'
 import Calc5, { computeStats as cs5 } from '../src/labs/lab5/calc.jsx'
 
-const n = (o) => Array.from({ length: 5 }, () => ({ ...o }))
+const n = (cnt, o) => Array.from({ length: o ? cnt : 5 }, () => ({ ...(o ?? cnt) }))
 
 const rows1 = n({ m: 0.1, t: 9.5, n1: 4.2, n2: 7.8, r: 0.04, h: 1.0 })
 const rows2 = [
@@ -27,8 +27,10 @@ const rows2 = [
 const rows3 = n({ m: 0.1, t: 4.5, r: 0.03, R: 0.1, h: 1.0, Jz: 0.0244 })
 const rows4 = n({ m: 0.01, M: 0.2, S1: 0.3, S2: 0.5, t: 1.32 })
 const rows5 = [
-  ...n({ vessel: 1, rhoS: 7860, rhoL: 1250, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
-  ...n({ vessel: 2, rhoS: 7860, rhoL: 900, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
+  ...n(3, { vessel: 1, name: 'Сталь', rhoS: 7860, rhoL: 1250, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
+  ...n(3, { vessel: 1, name: 'Медь', rhoS: 8930, rhoL: 1250, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
+  ...n(3, { vessel: 2, name: 'Сталь', rhoS: 7860, rhoL: 900, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
+  ...n(3, { vessel: 2, name: 'Свинец', rhoS: 11340, rhoL: 900, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
 ]
 
 const checks = [

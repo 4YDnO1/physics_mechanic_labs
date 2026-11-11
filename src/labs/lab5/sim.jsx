@@ -41,7 +41,7 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
       tau,
       hh: h,
       vsl: +vessel,
-      p: { vessel: +vessel, rhoS, rhoL, r, h, l },
+      p: { vessel: +vessel, name: bm.name, rhoS, rhoL, r, h, l },
       started: false,
     }
     setPhase('fall')
@@ -96,8 +96,13 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
 
   const t1rows = rows.filter((rw) => rw.vessel === 1)
   const t2rows = rows.filter((rw) => rw.vessel === 2)
+  const curRows = rows.filter((rw) => rw.vessel === +vessel)
+  const curName = bm.name
+  const curCount = curRows.filter((rw) => rw.name === curName).length
+  const matsCount = new Set(curRows.map((rw) => rw.name)).size
   const tblCols = [
     { key: 'i', label: '№' },
+    { key: 'name', label: 'Шарик', txt: true },
     { key: 'rhoS', label: 'ρш', unit: 'кг/м³', format: (v) => fmt(v, 0) },
     { key: 'rhoL', label: 'ρж', unit: 'кг/м³', format: (v) => fmt(v, 0) },
     { key: 'r', label: 'r', unit: 'м' },
@@ -162,6 +167,10 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
             <Readout label="Верхняя метка h" value={fmt(h, 2)} unit="м" />
             <Readout label="Расстояние l" value={fmt(l, 2)} unit="м" hl />
           </div>
+          <div className="small dim" style={{ marginTop: 6 }}>
+            В этом сосуде: {curRows.length} опытов, материалов шарика — {matsCount}. Требуется
+            минимум 2 материала по 3 опыта.
+          </div>
         </div>
         <div className="ctrl-card">
           <h5>Шарик</h5>
@@ -174,6 +183,7 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
           <Slider label="Радиус шарика r" value={r} onChange={setR} min={0.001} max={0.003} step={0.0005} unit="м" digits={3} />
           <div className="readouts" style={{ marginTop: 8 }}>
             <Readout label="ρш" value={fmt(bm.rho, 0)} unit="кг/м³" />
+            <Readout label={`«${curName}» в этом сосуде`} value={`${curCount} / 3`} unit="опыта" />
           </div>
           <div className="small dim" style={{ marginTop: 4 }}>
             Размер шарика на схеме увеличен для наглядности.
