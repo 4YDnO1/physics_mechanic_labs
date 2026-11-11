@@ -166,7 +166,7 @@ html, body {
 .ctrl-row label { flex: 1; font-size: 14px; }
 .ctrl-row .val { font-family: var(--mono); font-size: 13.5px; color: var(--acc); min-width: 84px; text-align: right; }
 
-input[type="range"] { flex: 1.3; accent-color: var(--acc); }
+input[type="range"] { flex: 1.3; accent-color: var(--acc); min-height: 34px; }
 input[type="number"], select {
   font-family: var(--mono); font-size: 14px; padding: 5px 8px;
   border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
@@ -259,6 +259,7 @@ table.data tr:last-child.sum td { background: #eef2fa; font-weight: 600; }
 .dim { color: var(--muted); }
 .small { font-size: 13px; }
 .center { text-align: center; }
+.btn, .tab, .radio-pill, .back-btn, .lab-card, .qa summary { touch-action: manipulation; }
 progress.progress {
   width: 100%; height: 8px; appearance: none; border: none;
   background: #e3e8f0; border-radius: 5px; overflow: hidden; margin: 6px 0 2px;
@@ -270,9 +271,97 @@ progress.progress::-moz-progress-bar { background: var(--acc); border-radius: 5p
 .footer { margin-top: auto; padding: 16px; text-align: center; color: #8a94ab; font-size: 12.5px; }
 
 @media (max-width: 760px) {
-  .practice .sim-col, .practice .ctrl-col { min-width: 100%; }
-  .panel { padding: 18px 14px 22px; }
-  .eq { gap: 8px; }
+  html, body { font-size: 15px; }
+
+  /* компактная шапка */
+  .app-header { padding: 11px 12px 10px; }
+  .app-header .h-logo { width: 32px; height: 32px; font-size: 16px; border-radius: 8px; }
+  .app-header h1 { font-size: 16.5px; }
+  .app-header .h-sub { font-size: 11.5px; }
+  .back-btn { padding: 8px 11px; font-size: 12.5px; }
+
+  .page { padding: 10px 8px 36px; }
+
+  /* каталог */
+  .catalog { grid-template-columns: 1fr; gap: 8px; }
+  .lab-card { padding: 11px 12px; border-radius: 11px; gap: 5px; }
+  .lab-badge { min-width: 36px; height: 36px; font-size: 16px; border-radius: 9px; }
+  .lab-card h3 { font-size: 14.5px; }
+  .lab-card .lc-goal { font-size: 12.5px; }
+  .intro-note { padding: 11px 13px; margin-bottom: 10px; font-size: 13px; border-radius: 11px; }
+
+  /* заголовок работы */
+  .lab-head { padding: 11px 12px; border-radius: 11px; margin-bottom: 8px; }
+  .lab-head h2 { font-size: 16px; min-width: 0; }
+  .lab-head .lh-goal { font-size: 13px; margin-top: 5px; }
+
+  /* вкладки: в одну прокручиваемую строку, прилипают к верху */
+  .tabs {
+    flex-wrap: nowrap; overflow-x: auto; margin: 0 0 8px; gap: 3px;
+    position: sticky; top: 0; z-index: 30;
+    background: var(--bg); padding: 6px 2px 0;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; white-space: nowrap; padding: 8px 11px; font-size: 13px; }
+  .tab .tab-n { margin-right: 5px; }
+
+  /* контентные панели: тоньше и плотнее */
+  .panel { padding: 13px 11px 18px; border-radius: 0 11px 11px 11px; }
+  .panel h3 { font-size: 16px; margin: 16px 0 8px; }
+  .panel h4 { font-size: 14px; margin: 14px 0 6px; }
+  .doc p { text-align: left; }
+  .eq { margin: 10px 0; gap: 8px; }
+  .steps li { padding: 7px 9px 7px 44px; }
+  .steps li::before { width: 23px; height: 23px; font-size: 12px; left: 9px; }
+
+  /* эксперимент: канвас во всю ширину, управление сразу под ним, таблицы ниже */
+  .practice { flex-direction: column; gap: 10px; }
+  .practice .sim-col { display: contents; }
+  .practice .ctrl-col { min-width: 0; max-width: none; }
+  .sim-frame { order: 1; border-radius: 10px; }
+  .sim-col > *:not(.sim-frame) { order: 3; margin-top: 10px; }
+  .sim-status { font-size: 12px; padding: 6px 9px; gap: 7px; }
+  .sim-status .readout { min-width: 0; }
+
+  /* крупные удобные элементы управления */
+  .ctrl-card { padding: 10px 11px; border-radius: 10px; margin-bottom: 10px; }
+  .ctrl-card h5 { font-size: 11.5px; margin-bottom: 6px; }
+  .ctrl-row { flex-wrap: wrap; margin: 8px 0; gap: 7px; }
+  .ctrl-row label { flex: 1 1 100%; font-size: 13px; line-height: 1.35; }
+  input[type="number"], select { font-size: 16px; padding: 8px 10px; width: 128px; }
+  select { min-width: 0; width: 100%; }
+  .ctrl-row .val { font-size: 14px; min-width: 0; }
+
+  .btn { padding: 12px 16px; font-size: 15px; }
+  .btn-row { gap: 8px; }
+  .radio-pill { padding: 10px 13px; font-size: 14px; }
+  .radio-row { gap: 7px; }
+
+  .readouts { gap: 6px; }
+  .readout { padding: 5px 9px; font-size: 11.5px; min-width: 0; }
+  .readout b { font-size: 13.5px; }
+
+  /* таблицы компактнее */
+  table.data { font-size: 12px; }
+  table.data th { padding: 6px 7px; }
+  table.data td { padding: 5px 7px; font-size: 11.5px; }
+  .table-cap { font-size: 11.5px; }
+
+  .result-box { padding: 11px 13px; border-radius: 10px; }
+  .result-box .rb-main { font-size: 15px; }
+  .qa summary { padding: 11px 12px; font-size: 13.5px; }
+  .qa .qa-body { padding: 2px 13px 13px; }
+  .conclusion-text { padding: 10px 13px; }
+
+  .footer { padding: 12px 8px; font-size: 11.5px; }
+}
+
+@media (max-width: 400px) {
+  .page { padding: 8px 5px 30px; }
+  .panel { padding: 11px 9px 16px; }
+  .two-tables { gap: 0; }
+  input[type="number"] { width: 104px; }
 }
 
 @media print {
