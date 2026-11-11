@@ -59,22 +59,54 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
     (dt, ctx) => {
       const s = sim.current
       if (s.phase === 'fall') {
-        const dts = dt * speed
-        const a = s.a0 - s.v / s.tau
-        s.v += a * dts
-        s.y += s.v * dts
-        s.t += s.started ? dts : 0
-        if (!s.started && s.y >= s.hh) {
-          s.started = true
-          s.y = s.hh
-          s.t = 0
+        // Точное решение уравнения dv/dt = a0 - v/tau (метод не зависит от шага):
+        // v(d) = vInf + (v - vInf)·e^(-d/tau);  y(d) = y + vInf·d + (v - vInf)·tau·(1 - e^(-d/tau)),
+        // поэтому записываемое время t НЕ зависит от скорости демонстрации.
+        const vi = s.a0 * s.tau
+        const yAt = (d) => s.y + vi * d + (s.v - vi) * s.tau * (1 - Math.exp(-d / s.tau))
+        const adv = (d) => {
+          const e = Math.exp(-d / s.tau)
+          s.y += vi * d + (s.v - vi) * s.tau * (1 - e)
+          s.v = vi + (s.v - vi) * e
         }
-        if (s.y >= H_BOTTOM) {
-          s.y = H_BOTTOM
-          s.phase = 'done'
-          const tm = +(s.t * noisePct(0.006)).toFixed(2)
-          onResult({ ...s.p, t: tm })
-          setPhase('done')
+        const timeTo = (target, lim) => {
+          if (yAt(lim) < target) return null
+          let lo = 0
+          let hi = lim
+          for (let i = 0; i < 40; i++) {
+            const mid = (lo + hi) / 2
+            if (yAt(mid) < target) lo = mid
+            else hi = mid
+          }
+          return (lo + hi) / 2
+        }
+        let rem = dt * speed
+        while (rem > 1e-9 && s.phase === 'fall') {
+          if (!s.started) {
+            const d1 = timeTo(s.hh, rem)
+            if (d1 == null) {
+              adv(rem)
+              break
+            }
+            adv(d1)
+            s.started = true
+            s.t = 0
+            rem -= d1
+          } else {
+            const d2 = timeTo(H_BOTTOM, rem)
+            if (d2 == null) {
+              adv(rem)
+              s.t += rem
+              break
+            }
+            adv(d2)
+            s.t += d2
+            s.y = H_BOTTOM
+            s.phase = 'done'
+            const tm = +(s.t * noisePct(0.006)).toFixed(2)
+            onResult({ ...s.p, t: tm })
+            setPhase('done')
+          }
         }
       }
       draw(ctx, s, { vessel, h1, h2, mat, r })

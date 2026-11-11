@@ -66,10 +66,11 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
         s.omega = s.k.a1 * s.t / s.p.r
         if (s.x >= s.p.h) {
           s.x = s.p.h
-          s.tFall = s.t
+          s.t = s.k.tFall
+          s.tFall = s.k.tFall
           const n1True = s.p.h / (2 * Math.PI * s.p.r)
           s.rec = {
-            t: +(s.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2),
+            t: +(s.k.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2),
             n1: +(n1True * noisePct(0.004)).toFixed(1),
           }
           s.phase = 'spin'
