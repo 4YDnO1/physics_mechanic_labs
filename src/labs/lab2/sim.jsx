@@ -18,6 +18,28 @@ const rad = (d) => (d * Math.PI) / 180
 const deg = (r) => (r * 180) / Math.PI
 const ballR = (m) => 12 + 13 * Math.cbrt(m / 0.5)
 
+const resolveBalls = (s) => {
+  const R1 = ballR(s.p.m1)
+  const R2 = ballR(s.p.m2)
+  const q1x = CX - (R1 + R2) / 2 - 1
+  const q2x = CX + (R1 + R2) / 2 + 1
+  const x1 = q1x + Lpx * Math.sin(s.th1)
+  const x2 = q2x + Lpx * Math.sin(s.th2)
+  if (x2 - x1 < R1 + R2) {
+    const avg = (s.th1 + s.th2) / 2
+    const half = 1 / Lpx
+    s.th1 = avg + half
+    s.th2 = avg - half
+    const v1 = Lpx * s.w1
+    const v2 = Lpx * s.w2
+    if (v1 - v2 > 0) {
+      const { m1, m2 } = s.p
+      s.w1 = (((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2)) / Lpx
+      s.w2 = (((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2)) / Lpx
+    }
+  }
+}
+
 export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
   const isPrint = version === 'print'
   const [mode, setMode] = useState('elastic')
@@ -55,7 +77,7 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
   }
 
   const step = (s, dt) => {
-    const sub = 3
+    const sub = 8
     const h = dt / sub
     for (let i = 0; i < sub; i++) {
       if (s.phase === 'fly') {
@@ -128,6 +150,7 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
             setPhase('done')
           }
         }
+        resolveBalls(s)
       }
     }
   }
@@ -347,6 +370,48 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
     ctx.arc(q1x, PIVY, 4, 0, Math.PI * 2)
     ctx.arc(q2x, PIVY, 4, 0, Math.PI * 2)
     ctx.fill()
+
+    if (s.phase === 'post' || s.phase === 'done') {
+      ctx.save()
+      ctx.setLineDash([4, 4])
+      ctx.strokeStyle = 'rgba(180,83,9,0.45)'
+      ctx.lineWidth = 1
+      for (const px of [q1x, q2x]) {
+        ctx.beginPath()
+        ctx.moveTo(px, PIVY)
+        ctx.lineTo(px, PIVY + Lpx + 16)
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      const arcR = 66
+      const drawArc = (px, th) => {
+        const a0 = Math.PI / 2
+        const a1 = Math.PI / 2 - th
+        ctx.strokeStyle = '#b45309'
+        ctx.lineWidth = 2.5
+        ctx.beginPath()
+        ctx.arc(px, PIVY, arcR, Math.min(a0, a1), Math.max(a0, a1))
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.arc(px, PIVY, 2.5, 0, Math.PI * 2)
+        ctx.fillStyle = '#b45309'
+        ctx.fill()
+      }
+
+      const c1 = s.rec1 !== null ? s.rec1 : deg(s.th1)
+      const c2 = s.rec2 !== null ? s.rec2 : deg(s.th2)
+      if (s.p.mode === 'elastic') {
+        drawArc(q1x, s.th1)
+        drawArc(q2x, s.th2)
+        label(ctx, `α₁' = ${fmt(c1, 1)}°`, q1x - 96, PIVY + Lpx + 8, 13, '#b45309')
+        label(ctx, `α₂' = ${fmt(c2, 1)}°`, q2x + 6, PIVY + Lpx + 8, 13, '#b45309')
+      } else {
+        drawArc(q1x, s.th1)
+        drawArc(q2x, s.th2)
+        label(ctx, `α' = ${fmt(c1, 1)}°`, q1x - 80, PIVY + Lpx + 8, 13, '#b45309')
+      }
+    }
 
     label(
       ctx,
