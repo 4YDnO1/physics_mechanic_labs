@@ -400,15 +400,31 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
       }
 
       const c1 = s.rec1 !== null ? s.rec1 : deg(s.th1)
-      const c2 = s.rec2 !== null ? s.rec2 : deg(s.th2)
+      const c2 = s.p.mode === 'elastic' ? (s.rec2 !== null ? s.rec2 : deg(s.th2)) : c1
+      drawArc(q1x, s.th1)
+      drawArc(q2x, s.th2)
+
+      const rayLen = Lpx + 24
+      ctx.save()
+      ctx.setLineDash([7, 4])
+      ctx.strokeStyle = '#b45309'
+      ctx.lineWidth = 2
+      for (const [px, c] of [
+        [q1x, c1],
+        [q2x, c2],
+      ]) {
+        const rr = rad(c)
+        ctx.beginPath()
+        ctx.moveTo(px, PIVY)
+        ctx.lineTo(px + rayLen * Math.sin(rr), PIVY + rayLen * Math.cos(rr))
+        ctx.stroke()
+      }
+      ctx.restore()
+
       if (s.p.mode === 'elastic') {
-        drawArc(q1x, s.th1)
-        drawArc(q2x, s.th2)
         label(ctx, `α₁' = ${fmt(c1, 1)}°`, q1x - 96, PIVY + Lpx + 8, 13, '#b45309')
         label(ctx, `α₂' = ${fmt(c2, 1)}°`, q2x + 6, PIVY + Lpx + 8, 13, '#b45309')
       } else {
-        drawArc(q1x, s.th1)
-        drawArc(q2x, s.th2)
         label(ctx, `α' = ${fmt(c1, 1)}°`, q1x - 80, PIVY + Lpx + 8, 13, '#b45309')
       }
     }
