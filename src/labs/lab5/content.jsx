@@ -236,8 +236,49 @@ export function Conclusions({ rows, stats, version = 'web' }) {
 
       <h3>Контрольные вопросы</h3>
       <div className="qa">
-        <details>
-          <summary>1. Какие силы действуют на шарик, падающий в вязкой жидкости?</summary>
+        {isPrint ? (
+          <>
+            <details>
+              <summary>1. Какие силы действуют на движущийся в жидкости шарик?</summary>
+              <div className="qa-body">
+                <p>
+                  На шарик действуют три силы: сила тяжести{' '}
+                  <Tex>{String.raw`P_1 = \rho_{\text{ш}}Vg`}</Tex> (направлена вниз);
+                  выталкивающая сила Архимеда <Tex>{String.raw`P_2 = \rho_{\text{ж}}Vg`}</Tex>{' '}
+                  (направлена вверх); сила сопротивления Стокса{' '}
+                  <Tex>{String.raw`F = 6\pi\eta r\nu`}</Tex> (направлена против движения).
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>2. Записать условие равномерного движения шарика в жидкости.</summary>
+              <div className="qa-body">
+                <p>
+                  При равномерном движении ускорение равно нулю, поэтому силы уравновешены:
+                </p>
+                <Eq>{String.raw`P_1 - P_2 - F = 0 \;\Rightarrow\; \rho_{\text{ш}}Vg - \rho_{\text{ж}}Vg - 6\pi\eta r\nu = 0`}</Eq>
+              </div>
+            </details>
+            <details>
+              <summary>3. Вывести рабочую формулу для коэффициента вязкости.</summary>
+              <div className="qa-body">
+                <p>
+                  Из условия равномерного движения выразим вязкость и подставим объём шарика{' '}
+                  <Tex>{String.raw`V = \frac{4}{3}\pi r^3`}</Tex>:
+                </p>
+                <Eq>{String.raw`\eta = \frac{(\rho_{\text{ш}}-\rho_{\text{ж}})Vg}{6\pi r\nu} = \frac{2r^2g(\rho_{\text{ш}}-\rho_{\text{ж}})}{9\nu}`}</Eq>
+                <p>
+                  Заменив скорость равномерного движения <Tex>{String.raw`\nu = l/t`}</Tex>,
+                  получаем рабочую формулу:{' '}
+                  <Tex>{String.raw`\eta = \dfrac{2r^2g(\rho_{\text{ш}}-\rho_{\text{ж}})\,t}{9l}`}</Tex>.
+                </p>
+              </div>
+            </details>
+          </>
+        ) : (
+          <>
+            <details>
+              <summary>1. Какие силы действуют на шарик, падающий в вязкой жидкости?</summary>
           <div className="qa-body">
             <p>
               На шарик действуют три силы: сила тяжести{' '}
@@ -292,6 +333,8 @@ export function Conclusions({ rows, stats, version = 'web' }) {
             </p>
           </div>
         </details>
+          </>
+        )}
       </div>
 
       <h3>Преобразование формул (вывод рабочей формулы)</h3>
