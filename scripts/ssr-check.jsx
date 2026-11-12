@@ -29,6 +29,7 @@ const rows2 = [
   ...n({ mode: 'inelastic', m1: 0.2, m2: 0.3, a1: 30, ap: 12 }),
 ]
 const rows2p = [
+  ...n({ mode: 'elastic', m1: 0.112, m2: 0.112, a1: 10, a1p: 0, a2p: 10 }),
   ...n({ mode: 'elastic', m1: 0.112, m2: 0.04, a1: 10, a1p: 4.7, a2p: 14.7 }),
   ...n({ mode: 'inelastic', m1: 0.112, m2: 0.04, a1: 10, ap: 7.4 }),
 ]

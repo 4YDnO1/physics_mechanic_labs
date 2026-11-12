@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Canvas, useSimLoop, bg, line, label, ball } from '../../utils/canvas.jsx'
-import { Btn, Readout, Slider, Radio } from '../../components/controls.jsx'
+import { Btn, Readout, Slider, Radio, Select } from '../../components/controls.jsx'
 import DataTable from '../../components/DataTable.jsx'
 import { G, fmt, rnd } from '../../utils/stats.js'
 
@@ -8,6 +8,11 @@ const L = 0.5
 const Lpx = 295
 const PIVY = 46
 const CX = 390
+
+const MASS_OPTS = [
+  { value: '0.04', label: '40 г' },
+  { value: '0.112', label: '112 г' },
+]
 
 const rad = (d) => (d * Math.PI) / 180
 const deg = (r) => (r * 180) / Math.PI
@@ -216,12 +221,13 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
           <h5>Характеристики шаров</h5>
           {isPrint ? (
             <>
-              <Readout label="Масса шара 1, m₁" value={fmt(m1 * 1000, 0)} unit="г" />
-              <Readout label="Масса шара 2, m₂" value={fmt(m2 * 1000, 0)} unit="г" />
+              <Select label="Масса шара 1, m₁" value={String(m1)} onChange={(v) => setM1(+v)} options={MASS_OPTS} />
+              <Select label="Масса шара 2, m₂" value={String(m2)} onChange={(v) => setM2(+v)} options={MASS_OPTS} />
               <Readout label="Начальный угол α₁" value={fmt(a1, 0)} unit="°" />
               <div className="small dim" style={{ marginTop: 4 }}>
-                Параметры заданы методикой: тяжёлый шар m₁ = 112 г, лёгкий m₂ = 40 г, α₁ = 10°,
-                l = {fmt(L, 2)} м.
+                Массы выбираются из набора методики: 112 г (тяжёлый) и 40 г (лёгкий). Опыты
+                проводят как с <b>равными</b> шарами (m₁ = m₂), так и с <b>разными</b> (112 г и 40 г);
+                α₁ = 10°, l = {fmt(L, 2)} м.
               </div>
             </>
           ) : (
