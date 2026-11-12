@@ -4,7 +4,7 @@ import Subst from '../../components/Subst.jsx'
 import { G, fmt, mean, meanAbsDev } from '../../utils/stats.js'
 import { LIQUIDS } from './content.jsx'
 
-export function computeStats(rows) {
+export function computeStats(rows, version = 'web') {
   const calc = rows.map((rw, i) => ({
     ...rw,
     i: i + 1,
@@ -65,8 +65,9 @@ function GroupResult({ g }) {
   )
 }
 
-function LiqCalc({ liq }) {
+function LiqCalc({ liq, version = 'web' }) {
   const { sub, groups } = liq
+  const isPrint = version === 'print'
   if (sub.length === 0) {
     return (
       <>
@@ -81,17 +82,32 @@ function LiqCalc({ liq }) {
     <>
       <h3>Таблица {liq.n}. Жидкость №{liq.n} (ρж = {fmt(liq.rho, 0)} кг/м³)</h3>
       <DataTable
-        rows={sub.map((r, i) => ({ ...r, i: i + 1 }))}
-        columns={[
-          { key: 'i', label: '№' },
-          { key: 'name', label: 'Шарик', txt: true },
-          { key: 'rhoS', label: 'ρш', unit: 'кг/м³', format: (v) => fmt(v, 0) },
-          { key: 'rhoL', label: 'ρж', unit: 'кг/м³', format: (v) => fmt(v, 0) },
-          { key: 'r', label: 'r', unit: 'м' },
-          { key: 'l', label: 'l', unit: 'м' },
-          { key: 't', label: 't', unit: 'с' },
-          { key: 'eta', label: 'η', unit: 'Па·с', format: (v) => fmt(v, 3) },
-        ]}
+        rows={sub.map((r, i) => ({ ...r, i: i + 1, rhoSg: r.rhoS / 1000, rhoLg: r.rhoL / 1000 }))}
+        columns={
+          isPrint
+            ? [
+                { key: 'i', label: '№' },
+                { key: 'name', label: 'Шарик', txt: true },
+                { key: 'rhoS', label: 'ρш', unit: 'кг/м³', format: (v) => fmt(v, 0) },
+                { key: 'rhoSg', label: 'ρш', unit: 'г/см³', format: (v) => fmt(v, 2) },
+                { key: 'rhoL', label: 'ρж', unit: 'кг/м³', format: (v) => fmt(v, 0) },
+                { key: 'rhoLg', label: 'ρж', unit: 'г/см³', format: (v) => fmt(v, 2) },
+                { key: 'r', label: 'r', unit: 'м' },
+                { key: 'l', label: 'l', unit: 'м' },
+                { key: 't', label: 't', unit: 'с' },
+                { key: 'eta', label: 'η', unit: 'Па·с', format: (v) => fmt(v, 3) },
+              ]
+            : [
+                { key: 'i', label: '№' },
+                { key: 'name', label: 'Шарик', txt: true },
+                { key: 'rhoS', label: 'ρш', unit: 'кг/м³', format: (v) => fmt(v, 0) },
+                { key: 'rhoL', label: 'ρж', unit: 'кг/м³', format: (v) => fmt(v, 0) },
+                { key: 'r', label: 'r', unit: 'м' },
+                { key: 'l', label: 'l', unit: 'м' },
+                { key: 't', label: 't', unit: 'с' },
+                { key: 'eta', label: 'η', unit: 'Па·с', format: (v) => fmt(v, 3) },
+              ]
+        }
         caption={`Расчёт по формуле (10): η = 2r²g(ρш − ρж)t / (9l)`}
       />
       <h4>Подстановка значений по опытам</h4>
@@ -119,9 +135,10 @@ function LiqCalc({ liq }) {
   )
 }
 
-export default function Lab5Calc({ rows }) {
-  const st = computeStats(rows)
+export default function Lab5Calc({ rows, version = 'web' }) {
+  const st = computeStats(rows, version)
   const has = rows.length > 0
+  const isPrint = version === 'print'
 
   return (
     <>
@@ -138,12 +155,18 @@ export default function Lab5Calc({ rows }) {
         расстояния <Tex>{String.raw`l`}</Tex> между метками. Для каждой жидкости выполняются серии
         опытов минимум с двумя материалами шариков — погрешности рассчитываются для каждой серии
         отдельно.
+        {isPrint && (
+          <>
+            {' '}В таблицах плотности приведены в кг/м³ и г/см³ (1 г/см³ = 1000 кг/м³), а значение{' '}
+            <Tex>{String.raw`\eta`}</Tex> вычислено по каждому опыту.
+          </>
+        )}
       </p>
 
       {has ? (
         <>
-          <LiqCalc liq={{ n: 1, ...st.byLiq[1], rho: LIQUIDS[0].rho }} />
-          <LiqCalc liq={{ n: 2, ...st.byLiq[2], rho: LIQUIDS[1].rho }} />
+          <LiqCalc version={version} liq={{ n: 1, ...st.byLiq[1], rho: LIQUIDS[0].rho }} />
+          <LiqCalc version={version} liq={{ n: 2, ...st.byLiq[2], rho: LIQUIDS[1].rho }} />
         </>
       ) : (
         <div className="tbl-empty">Нет данных для расчёта. Выполните измерения на вкладке «Эксперимент».</div>

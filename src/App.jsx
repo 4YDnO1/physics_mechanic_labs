@@ -4,6 +4,7 @@ import Lab2 from './labs/lab2/index.jsx'
 import Lab3 from './labs/lab3/index.jsx'
 import Lab4 from './labs/lab4/index.jsx'
 import Lab5 from './labs/lab5/index.jsx'
+import Lab6 from './labs/lab6/index.jsx'
 
 const LABS = [
   {
@@ -41,6 +42,13 @@ const LABS = [
     goal: 'определение коэффициентов внутреннего трения (вязкости) двух жидкостей методом Стокса.',
     Page: Lab5,
   },
+  {
+    id: 6,
+    accent: '#16a34a',
+    title: 'Определение кинематических параметров равнопеременного движения груза',
+    goal: 'определение кинематических характеристик равноускоренного движения груза и оценка их погрешностей.',
+    Page: Lab6,
+  },
 ]
 
 export default function App() {
@@ -54,7 +62,7 @@ export default function App() {
           <div className="h-logo">Φ</div>
           <div>
             <h1>Лабораторные работы по механике</h1>
-            <div className="h-sub">Виртуальный лабораторный практикум · 5 работ · теория, эксперимент, расчёты, выводы</div>
+            <div className="h-sub">Виртуальный лабораторный практикум · 6 работ · теория, эксперимент, расчёты, выводы</div>
           </div>
           {lab && (
             <button className="back-btn" onClick={() => setCurrent(null)}>

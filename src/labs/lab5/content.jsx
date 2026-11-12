@@ -1,4 +1,5 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
+import DataTable from '../../components/DataTable.jsx'
 import { fmt } from '../../utils/stats.js'
 
 export const LIQUIDS = [
@@ -18,7 +19,8 @@ export const BALLS = [
   { name: 'Цинк', rho: 7130, color: '#9fa9b5' },
 ]
 
-export function Theory() {
+export function Theory({ version = 'web' }) {
+  const isPrint = version === 'print'
   return (
     <>
       <h3>Содержание работы</h3>
@@ -74,11 +76,42 @@ export function Theory() {
         метками: <Tex>{String.raw`\nu = l/t`}</Tex>. Тогда рабочая формула принимает вид:
       </p>
       <Eq n={10}>{String.raw`\eta = \frac{2r^2g(\rho_{\text{ш}} - \rho_{\text{ж}})\,t}{9l}`}</Eq>
+
+      {isPrint && (
+        <>
+          <h3>Единицы измерения плотности</h3>
+          <p>
+            В расчётах плотности удобно выражать как в кг/м³, так и в г/см³. Соотношение единиц:
+          </p>
+          <Eq n={11}>{String.raw`1\ \text{г/см}^3 = 1000\ \text{кг/м}^3, \qquad \rho\,[\text{кг/м}^3] = 1000\,\rho\,[\text{г/см}^3]`}</Eq>
+          <p>Плотности материалов шариков, используемых в работе:</p>
+          <DataTable
+            rows={BALLS.map((b) => ({ name: b.name, kg: b.rho, g: b.rho / 1000 }))}
+            columns={[
+              { key: 'name', label: 'Материал', txt: true },
+              { key: 'kg', label: 'ρ, кг/м³', format: (v) => fmt(v, 0) },
+              { key: 'g', label: 'ρ, г/см³', format: (v) => fmt(v, 2) },
+            ]}
+            caption="Плотности материалов шариков"
+          />
+          <p>Плотности жидкостей:</p>
+          <DataTable
+            rows={LIQUIDS.map((l, i) => ({ name: l.name, kg: l.rho, g: l.rho / 1000 }))}
+            columns={[
+              { key: 'name', label: 'Жидкость', txt: true },
+              { key: 'kg', label: 'ρ, кг/м³', format: (v) => fmt(v, 0) },
+              { key: 'g', label: 'ρ, г/см³', format: (v) => fmt(v, 2) },
+            ]}
+            caption="Плотности жидкостей"
+          />
+        </>
+      )}
     </>
   )
 }
 
-export function Procedure() {
+export function Procedure({ version = 'web' }) {
+  const isPrint = version === 'print'
   return (
     <ol className="steps">
       <li>
@@ -113,6 +146,12 @@ export function Procedure() {
         <Tex>{String.raw`\eta_{\text{ср}}`}</Tex> и погрешность{' '}
         <Tex>{String.raw`\Delta\eta`}</Tex> <b>отдельно по каждому материалу шарика</b>; записать{' '}
         <Tex>{String.raw`\eta = \eta_{\text{ср}} \pm \Delta\eta`}</Tex> для каждой серии опытов.
+        {isPrint && (
+          <>
+            {' '}Плотности записывать как в кг/м³, так и в г/см³ (1 г/см³ = 1000 кг/м³); значение{' '}
+            <Tex>{String.raw`\eta`}</Tex> рассчитывается по каждому опыту.
+          </>
+        )}
       </li>
     </ol>
   )
@@ -159,7 +198,8 @@ function VesselConclusion({ rows, stats, liq }) {
   )
 }
 
-export function Conclusions({ rows, stats }) {
+export function Conclusions({ rows, stats, version = 'web' }) {
+  const isPrint = version === 'print'
   const has = rows.length > 0
   const anyDone = [1, 2].some(
     (liq) => stats[liq].groups.filter((g) => g.n >= 3).length >= 2
@@ -172,6 +212,13 @@ export function Conclusions({ rows, stats }) {
           <>
             <VesselConclusion rows={rows} stats={stats} liq={2} />
             <VesselConclusion rows={rows} stats={stats} liq={1} />
+            {isPrint && (
+              <p>
+                Значения <Tex>{String.raw`\eta`}</Tex> вычислены по каждому опыту; плотности шариков
+                и жидкостей приведены в кг/м³ и г/см³. Совпадение результатов, полученных с шариками
+                разных материалов, подтверждает, что вязкость является характеристикой жидкости.
+              </p>
+            )}
             <p className="small dim">
               Сравнение: вязкость жидкости №2 заметно ниже вязкости жидкости №1 — сила внутреннего
               трения в ней при прочих равных условиях меньше.

@@ -22,12 +22,16 @@ export default function DataTable({ columns, rows, caption, empty = 'Нет да
                 {columns.map((c) => {
                   const v = r[c.key]
                   const txt =
-                    v == null || v === '' || !Number.isFinite(v)
+                    v == null || v === ''
                       ? ''
-                      : c.format
-                        ? c.format(v, r)
-                        : typeof v === 'number'
-                          ? fmtDef(v)
+                      : typeof v === 'number'
+                        ? Number.isFinite(v)
+                          ? c.format
+                            ? c.format(v, r)
+                            : fmtDef(v)
+                          : ''
+                        : c.format
+                          ? c.format(v, r)
                           : String(v)
                   return <td key={c.key} className={c.txt ? 'txt' : ''}>{txt}</td>
                 })}

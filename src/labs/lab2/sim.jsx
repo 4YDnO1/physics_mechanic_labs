@@ -13,11 +13,12 @@ const rad = (d) => (d * Math.PI) / 180
 const deg = (r) => (r * 180) / Math.PI
 const ballR = (m) => 12 + 13 * Math.cbrt(m / 0.5)
 
-export default function Lab2Sim({ rows, onResult, onClear }) {
+export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
+  const isPrint = version === 'print'
   const [mode, setMode] = useState('elastic')
-  const [a1, setA1] = useState(45)
-  const [m1, setM1] = useState(0.2)
-  const [m2, setM2] = useState(0.1)
+  const [a1, setA1] = useState(isPrint ? 10 : 45)
+  const [m1, setM1] = useState(isPrint ? 0.112 : 0.2)
+  const [m2, setM2] = useState(isPrint ? 0.04 : 0.1)
   const [phase, setPhase] = useState('idle')
   const [live, setLive] = useState({ th1: 0, th2: 0 })
   const sim = useRef({ phase: 'idle' })
@@ -213,13 +214,27 @@ export default function Lab2Sim({ rows, onResult, onClear }) {
         </div>
         <div className="ctrl-card">
           <h5>Характеристики шаров</h5>
-          <Slider label="Масса шара 1, m₁" value={m1} onChange={setM1} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
-          <Slider label="Масса шара 2, m₂" value={m2} onChange={setM2} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
-          <Slider label="Начальный угол α₁" value={a1} onChange={setA1} min={15} max={70} step={1} unit="°" digits={0} />
-          <div className="small dim" style={{ marginTop: 4 }}>
-            Длина маятников l = {fmt(L, 2)} м. При m₁ &lt; m₂ первый шар после упругого удара
-            отскакивает назад.
-          </div>
+          {isPrint ? (
+            <>
+              <Readout label="Масса шара 1, m₁" value={fmt(m1 * 1000, 0)} unit="г" />
+              <Readout label="Масса шара 2, m₂" value={fmt(m2 * 1000, 0)} unit="г" />
+              <Readout label="Начальный угол α₁" value={fmt(a1, 0)} unit="°" />
+              <div className="small dim" style={{ marginTop: 4 }}>
+                Параметры заданы методикой: тяжёлый шар m₁ = 112 г, лёгкий m₂ = 40 г, α₁ = 10°,
+                l = {fmt(L, 2)} м.
+              </div>
+            </>
+          ) : (
+            <>
+              <Slider label="Масса шара 1, m₁" value={m1} onChange={setM1} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
+              <Slider label="Масса шара 2, m₂" value={m2} onChange={setM2} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
+              <Slider label="Начальный угол α₁" value={a1} onChange={setA1} min={15} max={70} step={1} unit="°" digits={0} />
+              <div className="small dim" style={{ marginTop: 4 }}>
+                Длина маятников l = {fmt(L, 2)} м. При m₁ &lt; m₂ первый шар после упругого удара
+                отскакивает назад.
+              </div>
+            </>
+          )}
         </div>
         <div className="ctrl-card">
           <h5>Управление</h5>

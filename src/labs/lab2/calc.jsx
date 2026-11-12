@@ -7,8 +7,39 @@ import { L } from './content.jsx'
 const K = 2 * Math.sqrt(G * L)
 const sin2 = (degAngle) => Math.sin((degAngle * Math.PI) / 180 / 2)
 
-export function computeStats(rows) {
+export function computeStats(rows, version = 'web') {
+  const isPrint = version === 'print'
   const calc = rows.map((r) => {
+    if (isPrint) {
+      if (r.mode === 'elastic') {
+        const pb = r.m1 * r.a1
+        const pa = r.m1 * r.a1p + r.m2 * r.a2p
+        const Eb = r.m1 * r.a1 * r.a1
+        const Ea = r.m1 * r.a1p * r.a1p + r.m2 * r.a2p * r.a2p
+        return {
+          ...r,
+          pb,
+          pa,
+          Eb,
+          Ea,
+          dp: Math.abs(pa - pb) / pb * 100,
+          dE: Math.abs(Ea - Eb) / Eb * 100,
+        }
+      }
+      const pb = r.m1 * r.a1
+      const pa = (r.m1 + r.m2) * r.ap
+      const Eb = r.m1 * r.a1 * r.a1
+      const Ea = (r.m1 + r.m2) * r.ap * r.ap
+      return {
+        ...r,
+        pb,
+        pa,
+        Eb,
+        Ea,
+        dp: Math.abs(pa - pb) / pb * 100,
+        dE: Math.abs(Ea - Eb) / Eb * 100,
+      }
+    }
     const v1 = K * sin2(r.a1)
     if (r.mode === 'elastic') {
       const u1 = Math.sign(r.a1p || 1) * K * sin2(Math.abs(r.a1p))
@@ -26,17 +57,19 @@ export function computeStats(rows) {
   const inel = calc.filter((c) => c.mode === 'inelastic')
   return {
     calc,
-    elast: { n: elast.length, davg: mean(elast.map((e) => e.dp)) },
-    inel: { n: inel.length, davg: mean(inel.map((e) => e.dp)) },
+    version,
+    elast: { n: elast.length, davg: mean(elast.map((e) => e.dp)), eavg: mean(elast.map((e) => e.dE)) },
+    inel: { n: inel.length, davg: mean(inel.map((e) => e.dp)), eavg: mean(inel.map((e) => e.dE)) },
   }
 }
 
-export default function Lab2Calc({ rows }) {
-  const st = computeStats(rows)
+export default function Lab2Calc({ rows, version = 'web' }) {
+  const isPrint = version === 'print'
+  const st = computeStats(rows, version)
   const elast = st.calc.filter((c) => c.mode === 'elastic')
   const inel = st.calc.filter((c) => c.mode === 'inelastic')
 
-  const substTex = (r) => {
+  const substWeb = (r) => {
     const v1 = String.raw`v_{1} &= 2\sqrt{gl}\,\sin\frac{\alpha_1}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.a1, 1)}^\circ}{2} = ${fmt(r.v1, 2)}\ \text{м/с}`
     const pd = String.raw`p_{\text{до}} &= m_1 v_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.v1, 2)} = ${fmt(r.pb, 3)}\ \text{кг·м/с}`
     if (r.mode === 'elastic') {
@@ -58,69 +91,146 @@ p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot $
 \end{aligned}`
   }
 
+  const substPrint = (r) => {
+    if (r.mode === 'elastic') {
+      return String.raw`\begin{aligned}
+p_{\text{до}} &= m_1\alpha_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)} = ${fmt(r.pb, 2)}\\
+p_{\text{после}} &= m_1\alpha_1' + m_2\alpha_2' = ${fmt(r.m1, 2)}\cdot(${fmt(r.a1p, 1)}) + ${fmt(r.m2, 2)}\cdot ${fmt(r.a2p, 1)} = ${fmt(r.pa, 2)}\\
+\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%\\
+E_{\text{до}} &= m_1\alpha_1^2 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)}^2 = ${fmt(r.Eb, 1)}\\
+E_{\text{после}} &= m_1\alpha_1'^2 + m_2\alpha_2'^2 = ${fmt(r.m1, 2)}\cdot(${fmt(r.a1p, 1)})^2 + ${fmt(r.m2, 2)}\cdot ${fmt(r.a2p, 1)}^2 = ${fmt(r.Ea, 1)}\\
+\Delta E &= \frac{|E_{\text{после}} - E_{\text{до}}|}{E_{\text{до}}}\cdot 100\% = ${fmt(r.dE, 1)}\%
+\end{aligned}`
+    }
+    return String.raw`\begin{aligned}
+p_{\text{до}} &= m_1\alpha_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)} = ${fmt(r.pb, 2)}\\
+p_{\text{после}} &= (m_1+m_2)\alpha' = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot ${fmt(r.ap, 1)} = ${fmt(r.pa, 2)}\\
+\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%\\
+E_{\text{до}} &= m_1\alpha_1^2 = ${fmt(r.Eb, 1)},\qquad E_{\text{после}} = (m_1+m_2)\alpha'^2 = ${fmt(r.Ea, 1)}\\
+\Delta E &= \frac{E_{\text{до}} - E_{\text{после}}}{E_{\text{до}}}\cdot 100\% = ${fmt(r.dE, 1)}\ \text{(потеря энергии)}
+\end{aligned}`
+  }
+
+  const substTex = isPrint ? substPrint : substWeb
+
   return (
     <>
-      <h3>Проверка закона сохранения импульса</h3>
-      <p>
-        Скорости шаров до и после удара определяются по углам отклонения из формулы (13). При{' '}
-        <Tex>{String.raw`l = ${fmt(L, 2)}`}</Tex> м множитель{' '}
-        <Tex>{String.raw`2\sqrt{gl} = ${fmt(K, 2)}`}</Tex> м/с, поэтому:
-      </p>
-      <Eq>{String.raw`v_1 = 2\sqrt{gl}\,\sin\frac{\alpha_1}{2},\qquad u_1 = \pm 2\sqrt{gl}\,\sin\frac{|\alpha_1'|}{2},\qquad u_2 = 2\sqrt{gl}\,\sin\frac{\alpha_2'}{2}`}</Eq>
-      <p>
-        Знак <Tex>{String.raw`u_1`}</Tex> определяется направлением движения первого шара после
-        удара (если <Tex>{String.raw`m_1 < m_2`}</Tex>, шар отскакивает назад — угол{' '}
-        <Tex>{String.raw`\alpha_1' < 0`}</Tex>). Импульс системы до удара и после удара:
-      </p>
-      <Eq>{String.raw`p_{\text{до}} = m_1 v_1, \qquad p_{\text{после}} = m_1 u_1 + m_2 u_2 \ \ \text{(упругий)}, \qquad p_{\text{после}} = (m_1+m_2)u\ \ \text{(неупругий)}`}</Eq>
-      <p>Относительное отклонение импульса в каждом опыте:</p>
-      <Eq>{String.raw`\Delta p = \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\%`}</Eq>
+      <h3>Проверка закона сохранения импульса{isPrint ? ' и энергии' : ''}</h3>
+
+      {isPrint ? (
+        <>
+          <p>
+            Начальный угол отклонения мал (<Tex>{String.raw`\alpha_1 = 10^\circ`}</Tex>), поэтому
+            справедливо приближение малых углов:{' '}
+            <Tex>{String.raw`\sin\frac{\alpha}{2} \approx \frac{\alpha}{2}`}</Tex>, то есть скорости
+            шаров пропорциональны углам отклонения. Проверка закона сохранения импульса ведётся
+            непосредственно по углам (в градусах):
+          </p>
+          <Eq n={16}>{String.raw`m_1\alpha_1 = m_1\alpha_1' + m_2\alpha_2'`}</Eq>
+          <p>а при абсолютно упругом ударе дополнительно проверяется закон сохранения энергии:</p>
+          <Eq n={17}>{String.raw`m_1\alpha_1^2 = m_1\alpha_1'^2 + m_2\alpha_2'^2`}</Eq>
+          <p>При абсолютно неупругом ударе сохраняется только импульс:</p>
+          <Eq n={18}>{String.raw`m_1\alpha_1 = (m_1+m_2)\alpha'`}</Eq>
+          <p>Относительные отклонения импульса и энергии в каждом опыте:</p>
+          <Eq>{String.raw`\Delta p = \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\%,\qquad \Delta E = \frac{|E_{\text{после}} - E_{\text{до}}|}{E_{\text{до}}}\cdot 100\%`}</Eq>
+        </>
+      ) : (
+        <>
+          <p>
+            Скорости шаров до и после удара определяются по углам отклонения из формулы (13). При{' '}
+            <Tex>{String.raw`l = ${fmt(L, 2)}`}</Tex> м множитель{' '}
+            <Tex>{String.raw`2\sqrt{gl} = ${fmt(K, 2)}`}</Tex> м/с, поэтому:
+          </p>
+          <Eq>{String.raw`v_1 = 2\sqrt{gl}\,\sin\frac{\alpha_1}{2},\qquad u_1 = \pm 2\sqrt{gl}\,\sin\frac{|\alpha_1'|}{2},\qquad u_2 = 2\sqrt{gl}\,\sin\frac{\alpha_2'}{2}`}</Eq>
+          <p>
+            Знак <Tex>{String.raw`u_1`}</Tex> определяется направлением движения первого шара после
+            удара (если <Tex>{String.raw`m_1 < m_2`}</Tex>, шар отскакивает назад — угол{' '}
+            <Tex>{String.raw`\alpha_1' < 0`}</Tex>). Импульс системы до удара и после удара:
+          </p>
+          <Eq>{String.raw`p_{\text{до}} = m_1 v_1, \qquad p_{\text{после}} = m_1 u_1 + m_2 u_2 \ \ \text{(упругий)}, \qquad p_{\text{после}} = (m_1+m_2)u\ \ \text{(неупругий)}`}</Eq>
+          <p>Относительное отклонение импульса в каждом опыте:</p>
+          <Eq>{String.raw`\Delta p = \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\%`}</Eq>
+        </>
+      )}
 
       {elast.length > 0 && (
         <>
-          <h4>Таблица 3. Абсолютно упругий удар</h4>
+          <h4>{isPrint ? 'Таблица 3. Упругий удар — импульс и энергия' : 'Таблица 3. Абсолютно упругий удар'}</h4>
           <DataTable
             rows={elast.map((r, i) => ({ ...r, i: i + 1 }))}
-            columns={[
-              { key: 'i', label: '№' },
-              { key: 'a1', label: 'α₁', unit: '°' },
-              { key: 'a1p', label: "α₁'", unit: '°' },
-              { key: 'a2p', label: "α₂'", unit: '°' },
-              { key: 'm1', label: 'm₁', unit: 'кг' },
-              { key: 'm2', label: 'm₂', unit: 'кг' },
-              { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-              { key: 'u1', label: 'u₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-              { key: 'u2', label: 'u₂', unit: 'м/с', format: (v) => fmt(v, 2) },
-              { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-              { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-              { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-            ]}
+            columns={
+              isPrint
+                ? [
+                    { key: 'i', label: '№' },
+                    { key: 'a1', label: 'α₁', unit: '°' },
+                    { key: 'a1p', label: "α₁'", unit: '°' },
+                    { key: 'a2p', label: "α₂'", unit: '°' },
+                    { key: 'm1', label: 'm₁', unit: 'кг' },
+                    { key: 'm2', label: 'm₂', unit: 'кг' },
+                    { key: 'pb', label: 'p до', format: (v) => fmt(v, 2) },
+                    { key: 'pa', label: 'p после', format: (v) => fmt(v, 2) },
+                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
+                    { key: 'Eb', label: 'E до', format: (v) => fmt(v, 1) },
+                    { key: 'Ea', label: 'E после', format: (v) => fmt(v, 1) },
+                    { key: 'dE', label: 'ΔE', unit: '%', format: (v) => fmt(v, 1) },
+                  ]
+                : [
+                    { key: 'i', label: '№' },
+                    { key: 'a1', label: 'α₁', unit: '°' },
+                    { key: 'a1p', label: "α₁'", unit: '°' },
+                    { key: 'a2p', label: "α₂'", unit: '°' },
+                    { key: 'm1', label: 'm₁', unit: 'кг' },
+                    { key: 'm2', label: 'm₂', unit: 'кг' },
+                    { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
+                    { key: 'u1', label: 'u₁', unit: 'м/с', format: (v) => fmt(v, 2) },
+                    { key: 'u2', label: 'u₂', unit: 'м/с', format: (v) => fmt(v, 2) },
+                    { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
+                    { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
+                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
+                  ]
+            }
           />
-          <p>Среднее отклонение импульса по опытам:</p>
-          <Eq>{String.raw`\overline{\Delta p} = \frac{1}{N}\sum_{i=1}^{N}\Delta p_i = \frac{${elast.map((r) => fmt(r.dp, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.davg, 1)}\%`}</Eq>
+          <p>Средние отклонения по опытам:</p>
+          <Eq>{String.raw`\overline{\Delta p} = \frac{${elast.map((r) => fmt(r.dp, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.davg, 1)}\%${isPrint ? String.raw`,\qquad \overline{\Delta E} = \frac{${elast.map((r) => fmt(r.dE, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.eavg, 1)}\%` : ''}`}</Eq>
         </>
       )}
 
       {inel.length > 0 && (
         <>
-          <h4>Таблица 4. Абсолютно неупругий удар</h4>
+          <h4>{isPrint ? 'Таблица 4. Неупругий удар — импульс и энергия' : 'Таблица 4. Абсолютно неупругий удар'}</h4>
           <DataTable
             rows={inel.map((r, i) => ({ ...r, i: i + 1 }))}
-            columns={[
-              { key: 'i', label: '№' },
-              { key: 'a1', label: 'α₁', unit: '°' },
-              { key: 'ap', label: "α'", unit: '°' },
-              { key: 'm1', label: 'm₁', unit: 'кг' },
-              { key: 'm2', label: 'm₂', unit: 'кг' },
-              { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-              { key: 'u', label: 'u', unit: 'м/с', format: (v) => fmt(v, 2) },
-              { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-              { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-              { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-            ]}
+            columns={
+              isPrint
+                ? [
+                    { key: 'i', label: '№' },
+                    { key: 'a1', label: 'α₁', unit: '°' },
+                    { key: 'ap', label: "α'", unit: '°' },
+                    { key: 'm1', label: 'm₁', unit: 'кг' },
+                    { key: 'm2', label: 'm₂', unit: 'кг' },
+                    { key: 'pb', label: 'p до', format: (v) => fmt(v, 2) },
+                    { key: 'pa', label: 'p после', format: (v) => fmt(v, 2) },
+                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
+                    { key: 'Eb', label: 'E до', format: (v) => fmt(v, 1) },
+                    { key: 'Ea', label: 'E после', format: (v) => fmt(v, 1) },
+                    { key: 'dE', label: 'ΔE', unit: '%', format: (v) => fmt(v, 1) },
+                  ]
+                : [
+                    { key: 'i', label: '№' },
+                    { key: 'a1', label: 'α₁', unit: '°' },
+                    { key: 'ap', label: "α'", unit: '°' },
+                    { key: 'm1', label: 'm₁', unit: 'кг' },
+                    { key: 'm2', label: 'm₂', unit: 'кг' },
+                    { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
+                    { key: 'u', label: 'u', unit: 'м/с', format: (v) => fmt(v, 2) },
+                    { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
+                    { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
+                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
+                  ]
+            }
           />
-          <p>Среднее отклонение импульса по опытам:</p>
-          <Eq>{String.raw`\overline{\Delta p} = \frac{1}{N}\sum_{i=1}^{N}\Delta p_i = \frac{${inel.map((r) => fmt(r.dp, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.davg, 1)}\%`}</Eq>
+          <p>Средние отклонения по опытам:</p>
+          <Eq>{String.raw`\overline{\Delta p} = \frac{${inel.map((r) => fmt(r.dp, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.davg, 1)}\%${isPrint ? String.raw`,\qquad \overline{\Delta E} = \frac{${inel.map((r) => fmt(r.dE, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.eavg, 1)}\%` : ''}`}</Eq>
         </>
       )}
 
@@ -128,8 +238,9 @@ p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot $
         <>
           <h4>Подстановка значений по опытам</h4>
           <p>
-            Для каждого опыта вычисляются скорости шаров, импульс до и после удара и относительное
-            отклонение импульса:
+            {isPrint
+              ? 'Для каждого опыта импульс и (при упругом ударе) энергия вычисляются по углам отклонения:'
+              : 'Для каждого опыта вычисляются скорости шаров, импульс до и после удара и относительное отклонение импульса:'}
           </p>
           <Subst items={st.calc.map((r) => substTex(r))} />
         </>
@@ -139,12 +250,34 @@ p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot $
         <>
           <h4>Сравнение с теорией</h4>
           <p>
-            По формулам (10) и (5) вычисляются теоретические углы отклонения после удара и
-            сравниваются с измеренными:
+            {isPrint ? (
+              <>
+                По формулам (9) и (5) в приближении малых углов вычисляются теоретические углы
+                отклонения после удара и сравниваются с измеренными:
+              </>
+            ) : (
+              <>
+                По формулам (10) и (5) вычисляются теоретические углы отклонения после удара и
+                сравниваются с измеренными:
+              </>
+            )}
           </p>
-          <Eq>{String.raw`\sin\frac{\alpha_{1,\text{теор}}}{2} = \frac{m_1-m_2}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{2,\text{теор}}}{2} = \frac{2m_1}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{\text{теор}}}{2} = \frac{m_1}{m_1+m_2}\sin\frac{\alpha_1}{2}`}</Eq>
+          <Eq>{isPrint
+            ? String.raw`\alpha_{1,\text{теор}}' = \frac{m_1-m_2}{m_1+m_2}\,\alpha_1,\qquad \alpha_{2,\text{теор}}' = \frac{2m_1}{m_1+m_2}\,\alpha_1,\qquad \alpha_{\text{теор}}' = \frac{m_1}{m_1+m_2}\,\alpha_1`
+            : String.raw`\sin\frac{\alpha_{1,\text{теор}}}{2} = \frac{m_1-m_2}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{2,\text{теор}}}{2} = \frac{2m_1}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{\text{теор}}}{2} = \frac{m_1}{m_1+m_2}\sin\frac{\alpha_1}{2}`}</Eq>
           <DataTable
             rows={st.calc.map((r, i) => {
+              if (isPrint) {
+                const at1 = r.mode === 'elastic' ? ((r.m1 - r.m2) / (r.m1 + r.m2)) * r.a1 : null
+                const at2 = r.mode === 'elastic' ? (2 * r.m1 / (r.m1 + r.m2)) * r.a1 : null
+                const at = r.mode === 'inelastic' ? (r.m1 / (r.m1 + r.m2)) * r.a1 : null
+                return {
+                  i: i + 1,
+                  mode: r.mode === 'elastic' ? 'упругий' : 'неупругий',
+                  meas: r.mode === 'elastic' ? `${fmt(r.a1p, 1)} / ${fmt(r.a2p, 1)}` : fmt(r.ap, 1),
+                  theor: r.mode === 'elastic' ? `${fmt(at1, 1)} / ${fmt(at2, 1)}` : fmt(at, 1),
+                }
+              }
               const s1 = sin2(r.a1)
               const at1 = r.mode === 'elastic' ? 2 * Math.asin(((r.m1 - r.m2) / (r.m1 + r.m2)) * s1) * 180 / Math.PI : null
               const at2 = r.mode === 'elastic' ? 2 * Math.asin((2 * r.m1 / (r.m1 + r.m2)) * s1) * 180 / Math.PI : null
@@ -173,10 +306,20 @@ p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot $
 
       {rows.length > 0 && (
         <div className="result-box">
-          <div className="rb-main">Закон сохранения импульса выполняется</div>
+          <div className="rb-main">
+            {isPrint ? 'Импульс (и энергия при упругом ударе) сохраняются' : 'Закон сохранения импульса выполняется'}
+          </div>
           <div className="rb-sub">
-            {st.elast.n > 0 && <>Упругий удар: среднее отклонение Δp = {fmt(st.elast.davg, 1)} % ({st.elast.n} опытов). </>}
-            {st.inel.n > 0 && <>Неупругий удар: среднее отклонение Δp = {fmt(st.inel.davg, 1)} % ({st.inel.n} опытов).</>}
+            {st.elast.n > 0 && (
+              <>
+                Упругий удар: Δp = {fmt(st.elast.davg, 1)} %{isPrint ? `, ΔE = ${fmt(st.elast.eavg, 1)} %` : ''} ({st.elast.n} опытов).{' '}
+              </>
+            )}
+            {st.inel.n > 0 && (
+              <>
+                Неупругий удар: Δp = {fmt(st.inel.davg, 1)} %{isPrint ? `, потеря энергии ΔE = ${fmt(st.inel.eavg, 1)} %` : ''} ({st.inel.n} опытов).
+              </>
+            )}
           </div>
         </div>
       )}

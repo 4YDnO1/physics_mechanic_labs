@@ -16,6 +16,9 @@ export default function LabShell({
   goal,
   equipment,
   progress,
+  versions,
+  version,
+  onVersion,
   theory,
   procedure,
   practice,
@@ -24,6 +27,7 @@ export default function LabShell({
 }) {
   const [tab, setTab] = useState('info')
   const done = progress && progress.done >= progress.total
+  const activeVersion = versions && versions.find((v) => v.key === version)
   return (
     <div style={{ ['--acc']: accent }}>
       <div className="lab-head">
@@ -46,6 +50,24 @@ export default function LabShell({
         <div className="lh-goal">
           <b>Цель работы:</b> {goal}
         </div>
+        {versions ? (
+          <div className="version-bar">
+            <span className="vb-label">Вариант выполнения:</span>
+            <div className="vb-seg" role="tablist">
+              {versions.map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  className={'vb-btn' + (v.key === version ? ' on' : '')}
+                  onClick={() => onVersion(v.key)}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            {activeVersion?.hint ? <span className="vb-hint">{activeVersion.hint}</span> : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="tabs">

@@ -19,16 +19,19 @@ function kin(r, h, m) {
   const wEnd = (a1 * tFall) / r
   const eps2 = MF / J_TRUE
   const tStop = wEnd / eps2
-  return { a1, tFall, wEnd, eps2, tStop }
+  const a2 = (r * (m * G * r + MF)) / (J_TRUE + m * r * r)
+  const h1 = h * (a1 / a2)
+  return { a1, tFall, wEnd, eps2, tStop, a2, h1 }
 }
 
-export default function Lab1Sim({ rows, onResult, onClear }) {
+export default function Lab1Sim({ version, rows, onResult, onClear }) {
+  const isPrint = version === 'print'
   const [r, setR] = useState(0.05)
   const [h, setH] = useState(1.5)
   const [m, setM] = useState(0.2)
   const [speed, setSpeed] = useState(3)
   const [phase, setPhase] = useState('idle')
-  const [live, setLive] = useState({ t: 0, n: 0, w: 0 })
+  const [live, setLive] = useState({ t: 0, x: 0, w: 0 })
   const sim = useRef({ phase: 'idle' })
   const cnv = useRef(null)
   const acc = useRef(0)
@@ -40,12 +43,13 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
       theta: 0,
       omega: 0,
       x: 0,
+      tau: 0,
       k: kin(r, h, m),
       p: { r, h, m },
       rec: null,
     }
     setPhase('ready')
-    setLive({ t: 0, n: 0, w: 0 })
+    setLive({ t: 0, x: 0, w: 0 })
   }
 
   const start = () => {
@@ -63,19 +67,38 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
         s.t += dt * spd
         s.x = 0.5 * s.k.a1 * s.t * s.t
         s.theta = s.x / s.p.r
-        s.omega = s.k.a1 * s.t / s.p.r
+        s.omega = (s.k.a1 * s.t) / s.p.r
         if (s.x >= s.p.h) {
           s.x = s.p.h
           s.t = s.k.tFall
           s.tFall = s.k.tFall
-          const n1True = s.p.h / (2 * Math.PI * s.p.r)
-          s.rec = {
-            t: +(s.k.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2),
-            n1: +(n1True * noisePct(0.004)).toFixed(1),
+          const tMeas = +(s.k.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2)
+          if (isPrint) {
+            s.rec = { t: tMeas }
+            s.phase = 'rebound'
+            s.tau = 0
+            s.omega = s.k.wEnd
+            setPhase('rebound')
+          } else {
+            const n1True = s.p.h / (2 * Math.PI * s.p.r)
+            s.rec = { t: tMeas, n1: +(n1True * noisePct(0.004)).toFixed(1) }
+            s.phase = 'spin'
+            s.omega = s.k.wEnd
+            setPhase('spin')
           }
-          s.phase = 'spin'
-          s.omega = s.k.wEnd
-          setPhase('spin')
+        }
+      } else if (s.phase === 'rebound') {
+        s.tau += dt * spd
+        const rise = 0.5 * s.k.a2 * s.tau * s.tau
+        s.x = Math.max(s.p.h - rise, 0)
+        s.omega = Math.max(s.k.wEnd - (s.k.a2 / s.p.r) * s.tau, 0)
+        if (rise >= s.k.h1) {
+          s.x = s.p.h - s.k.h1
+          s.omega = 0
+          s.phase = 'done'
+          s.rec.h1 = +(s.k.h1 * noisePct(0.006)).toFixed(3)
+          onResult({ ...s.p, t: s.rec.t, h1: s.rec.h1 })
+          setPhase('done')
         }
       } else if (s.phase === 'spin') {
         s.omega -= s.k.eps2 * dt * spd
@@ -89,11 +112,11 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
           setPhase('done')
         }
       }
-      draw(ctx, s, phase)
+      draw(ctx, s, version)
       acc.current += dt
       if (acc.current > 0.1) {
         acc.current = 0
-        setLive({ t: s.tFall ?? s.t, n: s.theta / (2 * Math.PI), w: s.omega })
+        setLive({ t: s.tFall ?? s.t, x: s.x || 0, w: s.omega })
       }
     },
     true
@@ -104,8 +127,30 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
     ready: 'Груз поднят на высоту h. Нажмите «Старт».',
     fall: 'Падение груза — маховик раскручивается…',
     spin: 'Свободный выбег маховика после касания грузом пола…',
+    rebound: 'Нить наматывается обратно — груз поднимается на высоту h₁…',
     done: 'Опыт завершён. Результаты занесены в таблицу.',
   }[phase]
+
+  const columns = isPrint
+    ? [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 'h1', label: 'h₁', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+      ]
+    : [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+        { key: 'n1', label: 'n₁', unit: 'об' },
+        { key: 'n2', label: 'n₂', unit: 'об' },
+      ]
+
+  const last = rows[rows.length - 1]
 
   return (
     <div className="practice">
@@ -116,9 +161,15 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
             <span className="readout">
               t<b>{fmt(live.t, 2)} с</b>
             </span>
-            <span className="readout">
-              n<b>{fmt(live.n, 1)} об</b>
-            </span>
+            {isPrint ? (
+              <span className="readout">
+                h<b>{fmt(live.x, 2)} м</b>
+              </span>
+            ) : (
+              <span className="readout">
+                n<b>{fmt(live.x / (2 * Math.PI * (sim.current.p?.r ?? r)), 1)} об</b>
+              </span>
+            )}
             <span className="readout">
               ω<b>{fmt(live.w, 1)} рад/с</b>
             </span>
@@ -129,15 +180,7 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
           <h4>Таблица результатов</h4>
           <DataTable
             rows={rows}
-            columns={[
-              { key: 'i', label: '№' },
-              { key: 'm', label: 'm', unit: 'кг' },
-              { key: 'r', label: 'r', unit: 'м' },
-              { key: 'h', label: 'h', unit: 'м' },
-              { key: 't', label: 't', unit: 'с' },
-              { key: 'n1', label: 'n₁', unit: 'об' },
-              { key: 'n2', label: 'n₂', unit: 'об' },
-            ]}
+            columns={columns}
             caption="Радиус шкива r, высота падения h и масса груза m задаются перед каждым опытом"
           />
         </div>
@@ -153,7 +196,7 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
         <div className="ctrl-card">
           <h5>Управление</h5>
           <div className="btn-row">
-            <Btn onClick={prepare} disabled={phase === 'fall' || phase === 'spin'}>
+            <Btn onClick={prepare} disabled={phase === 'fall' || phase === 'spin' || phase === 'rebound'}>
               Подготовить
             </Btn>
             <Btn onClick={start} disabled={phase !== 'ready'}>
@@ -169,9 +212,15 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
         <div className="ctrl-card">
           <h5>Измеряемые величины</h5>
           <div className="readouts">
-            <Readout label="t — время падения" value={rows.length ? fmt(rows[rows.length - 1].t, 2) : '—'} unit="с" hl />
-            <Readout label="n₁ — оборотов при падении" value={rows.length ? fmt(rows[rows.length - 1].n1, 1) : '—'} unit="об" />
-            <Readout label="n₂ — оборотов до остановки" value={rows.length ? fmt(rows[rows.length - 1].n2, 1) : '—'} unit="об" />
+            <Readout label="t — время падения" value={last ? fmt(last.t, 2) : '—'} unit="с" hl />
+            {isPrint ? (
+              <Readout label="h₁ — высота подъёма" value={last ? fmt(last.h1, 3) : '—'} unit="м" />
+            ) : (
+              <>
+                <Readout label="n₁ — оборотов при падении" value={last ? fmt(last.n1, 1) : '—'} unit="об" />
+                <Readout label="n₂ — оборотов до остановки" value={last ? fmt(last.n2, 1) : '—'} unit="об" />
+              </>
+            )}
           </div>
           {rows.length > 0 && (
             <div className="btn-row">
@@ -186,12 +235,13 @@ export default function Lab1Sim({ rows, onResult, onClear }) {
   )
 }
 
-function draw(ctx, s, phase) {
+function draw(ctx, s, version) {
   bg(ctx)
   const cx = 235
   const cy = 168
   const Rf = 106
   const Rp = 38
+  const isPrint = version === 'print'
 
   ctx.fillStyle = '#e7ebf2'
   ctx.fillRect(0, 436, 780, 34)
@@ -270,7 +320,7 @@ function draw(ctx, s, phase) {
   ctx.lineWidth = 2.2
   ctx.beginPath()
   ctx.moveTo(cx, y0)
-  if (s.phase === 'spin' || s.phase === 'done') {
+  if (!isPrint && (s.phase === 'spin' || s.phase === 'done')) {
     ctx.quadraticCurveTo(cx + 30, (y0 + floorLineY) / 2, cx, floorLineY - wH)
   } else {
     ctx.lineTo(cx, wTop)
@@ -298,7 +348,7 @@ function draw(ctx, s, phase) {
 
   label(ctx, `r = ${fmt(s.p?.r ?? 0.05, 2)} м   h = ${fmt(hh, 2)} м   m = ${fmt(s.p?.m ?? 0.2, 2)} кг`, 22, 30, 13.5, '#44506b')
 
-  if (s.phase === 'spin' || s.phase === 'fall') {
+  if (s.phase === 'spin' || s.phase === 'fall' || s.phase === 'rebound') {
     ctx.strokeStyle = '#d97706'
     ctx.lineWidth = 3
     ctx.beginPath()
@@ -306,4 +356,3 @@ function draw(ctx, s, phase) {
     ctx.stroke()
   }
 }
-
