@@ -116,7 +116,7 @@ export default function Lab6Sim({ rows, onResult, onClear }) {
           <Select label="Радиус шкива R" value={R} onChange={(v) => setR(+v)} options={R_OPTS} />
           <Slider label="Высота падения h" value={h} onChange={setH} min={0.8} max={2} step={0.05} unit="м" digits={2} />
         </div>
-        <div className="ctrl-card">
+        <div className="ctrl-card action-card">
           <h5>Управление</h5>
           <div className="btn-row">
             <Btn onClick={prepare} disabled={phase === 'fall'}>

@@ -236,7 +236,7 @@ export default function Lab5Sim({ version, rows, onResult, onClear }) {
             <Readout label="τ = 1/β" value={fmt(1 / beta, 2)} unit="с" />
           </div>
         </div>
-        <div className="ctrl-card">
+        <div className="ctrl-card action-card">
           <h5>Управление</h5>
           <div className="btn-row">
             <Btn onClick={prepare} disabled={phase === 'run'}>

@@ -229,7 +229,7 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
             Нижняя метка общая: 0,45 м от поверхности.
           </div>
         </div>
-        <div className="ctrl-card">
+        <div className="ctrl-card action-card">
           <h5>Управление</h5>
           <div className="btn-row">
             <Btn onClick={drop} disabled={phase === 'fall'}>

@@ -193,7 +193,7 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
           <Slider label="Высота падения h" value={h} onChange={setH} min={0.8} max={2} step={0.05} unit="м" digits={2} />
           <Slider label="Масса груза m" value={m} onChange={setM} min={0.1} max={0.5} step={0.01} unit="кг" digits={2} />
         </div>
-        <div className="ctrl-card">
+        <div className="ctrl-card action-card">
           <h5>Управление</h5>
           <div className="btn-row">
             <Btn onClick={prepare} disabled={phase === 'fall' || phase === 'spin' || phase === 'rebound'}>

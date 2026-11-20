@@ -265,7 +265,7 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
             </>
           )}
         </div>
-        <div className="ctrl-card">
+        <div className="ctrl-card action-card">
           <h5>Управление</h5>
           <div className="btn-row">
             <Btn onClick={prepare} disabled={phase === 'fly' || phase === 'post'}>
