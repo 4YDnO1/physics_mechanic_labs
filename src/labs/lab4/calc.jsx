@@ -61,6 +61,7 @@ function GroupResult({ g }) {
         )}
       />
       <Eq>{String.raw`\Delta\eta = \frac{1}{N}\sum_{i=1}^{N}\left|\eta_i - \eta_{\text{ср}}\right| = \frac{${g.rows.map((r) => fmt(Math.abs(r.eta - g.etaM), 3)).join(' + ')}}{${g.n}} = ${fmt(g.dEta, 3)}\ \text{Па·с}`}</Eq>
+      <Eq>{String.raw`\delta_\eta = \frac{\Delta\eta}{\eta_{\text{ср}}}\cdot 100\% = ${fmt(g.rel, 2)}\%`}</Eq>
     </div>
   )
 }

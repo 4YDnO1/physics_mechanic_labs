@@ -83,6 +83,21 @@ export function Theory({ version }) {
         <Tex>{String.raw`\varphi_0 = 0`}</Tex> имеет вид
       </p>
       <Eq n={11}>{String.raw`x(t) = A_0 e^{-t/\tau}\cos(\omega t)`}</Eq>
+
+      <h3>Обработка результатов измерений</h3>
+      <p>
+        Погрешности периода и логарифмического декремента рассчитываются в одном порядке.
+        Сначала находят значения по каждому опыту, затем среднее и модули отклонений, после чего
+        вычисляют среднюю абсолютную и относительную погрешности.
+      </p>
+      <Eq n={12}>{String.raw`x_i = f(\text{измерения}), \qquad \bar x = \frac{1}{N}\sum_{i=1}^{N}x_i`}</Eq>
+      <Eq n={13}>{String.raw`\Delta x_i = \left|x_i - \bar x\right|`}</Eq>
+      <Eq n={14}>{String.raw`\Delta x = \frac{1}{N}\sum_{i=1}^{N}\Delta x_i`}</Eq>
+      <Eq n={15}>{String.raw`\delta_{\text{отн}} = \frac{\Delta x}{\bar x}\cdot 100\%`}</Eq>
+      <p>
+        Здесь <Tex>{String.raw`x`}</Tex> — период <Tex>{String.raw`T_i = t_{10,i}/10`}</Tex> или
+        логарифмический декремент <Tex>{String.raw`\delta_i`}</Tex>, найденный по парам амплитуд.
+      </p>
     </>
   )
 }
@@ -159,11 +174,13 @@ export function Conclusions({ rows, stats }) {
         <>
           <p>
             По результатам {tRows.length} измерений времени десяти колебаний получен период{' '}
-            <Tex>{String.raw`T = ${fmt(s.T, 3)}\ \text{с}`}</Tex>. Средний логарифмический декремент
-            по трём парам чётных амплитуд составляет{' '}
-            <Tex>{String.raw`\delta = ${fmt(s.delta, 4)}`}</Tex>, коэффициент затухания{' '}
-            <Tex>{String.raw`\beta = ${fmt(s.beta, 4)}\ \text{с}^{-1}`}</Tex>, время релаксации{' '}
-            <Tex>{String.raw`\tau = ${fmt(s.tau, 2)}\ \text{с}`}</Tex>, добротность{' '}
+            <Tex>{String.raw`T = (${fmt(s.T, 4)} \pm ${fmt(s.dT, 4)})\ \text{с}`}</Tex> (
+            <Tex>{String.raw`\delta_{\text{отн},T} = ${fmt(s.dTRel, 1)}\%`}</Tex>). Средний
+            логарифмический декремент по трём парам чётных амплитуд составляет{' '}
+            <Tex>{String.raw`\delta = (${fmt(s.delta, 4)} \pm ${fmt(s.dDelta, 4)})`}</Tex> (
+            <Tex>{String.raw`\delta_{\text{отн},\delta} = ${fmt(s.dDeltaRel, 1)}\%`}</Tex>).
+            Коэффициент затухания <Tex>{String.raw`\beta = ${fmt(s.beta, 4)}\ \text{с}^{-1}`}</Tex>,
+            время релаксации <Tex>{String.raw`\tau = ${fmt(s.tau, 2)}\ \text{с}`}</Tex>, добротность{' '}
             <Tex>{String.raw`Q = ${fmt(s.Q, 1)}`}</Tex>.
           </p>
           <Eq>{String.raw`x(t) = ${fmt(s.A0, 2)} e^{-t/${fmt(s.tau, 2)}} \cos(${fmt(s.omega, 3)}\,t)\ (\text{град})`}</Eq>

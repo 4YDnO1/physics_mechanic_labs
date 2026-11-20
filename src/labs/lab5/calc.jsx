@@ -1,10 +1,9 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
 import Subst from '../../components/Subst.jsx'
-import { fmt, mean } from '../../utils/stats.js'
-import { DA, DT_INSTR, N_OSC } from './content.jsx'
+import { fmt, mean, meanAbsDev } from '../../utils/stats.js'
+import { N_OSC } from './content.jsx'
 
-const T_ALPHA = { 2: 12.706, 3: 4.303, 4: 3.182, 5: 2.776, 6: 2.571, 7: 2.447, 8: 2.365, 9: 2.306, 10: 2.262 }
 const PAIRS = [
   [0, 2],
   [2, 4],
@@ -16,30 +15,23 @@ export function computeStats(rows) {
   const aRows = rows.filter((r) => r.kind === 'A')
   if (!tRows.length || !aRows.length) return {}
 
-  const t10s = tRows.map((r) => r.t10)
-  const n = t10s.length
-  const tMean = mean(t10s)
-  const dev = t10s.map((t) => t - tMean)
-  const sq = dev.map((d) => d * d)
-  const sumSq = sq.reduce((s, x) => s + x, 0)
-  const sn = n > 1 ? Math.sqrt(sumSq / (n * (n - 1))) : NaN
-  const tAlpha = T_ALPHA[n] ?? 4.303
-  const dtSl = tAlpha * sn
-  const dt = dtSl + DT_INSTR
-  const T = tMean / N_OSC
-  const dT = dt / N_OSC
-  const dTRel = (dT / T) * 100
+  const per = tRows.map((r, i) => ({ ...r, i: i + 1, T: r.t10 / N_OSC }))
+  const Ts = per.map((p) => p.T)
+  const TMean = mean(Ts)
+  const tdev = Ts.map((v) => Math.abs(v - TMean))
+  const dT = meanAbsDev(Ts)
+  const dTRel = TMean ? (dT / TMean) * 100 : NaN
 
   const A = aRows[aRows.length - 1].A
   const deltas = PAIRS.map(([i, j]) => Math.log(A[i] / A[j]))
   const delta = mean(deltas)
-  const Aavg = mean(PAIRS.flatMap(([i, j]) => [A[i], A[j]]))
-  const dDeltaRel = ((Math.SQRT2 * DA) / (Aavg * Math.max(delta, 1e-6))) * 100
-  const dDelta = (dDeltaRel / 100) * delta
+  const ddev = deltas.map((v) => Math.abs(v - delta))
+  const dDelta = meanAbsDev(deltas)
+  const dDeltaRel = delta ? (dDelta / delta) * 100 : NaN
 
-  const beta = delta / T
+  const beta = delta / TMean
   const tau = 1 / beta
-  const omega0 = (2 * Math.PI) / T
+  const omega0 = (2 * Math.PI) / TMean
   const omega = Math.sqrt(Math.max(0, omega0 * omega0 - beta * beta))
   const Q = Math.PI / delta
   const dBetaRel = dTRel + dDeltaRel
@@ -47,8 +39,8 @@ export function computeStats(rows) {
   const dQRel = dDeltaRel
 
   return {
-    n, t10s, tMean, dev, sq, sumSq, sn, tAlpha, dtSl, dt, T, dT, dTRel,
-    A, A0: A[0], deltas, delta, dDelta, dDeltaRel,
+    per, Ts, T: TMean, TMean, tdev, dT, dTRel,
+    A, A0: A[0], deltas, delta, ddev, dDelta, dDeltaRel,
     beta, tau, omega0, omega, Q,
     dBetaRel, dTauRel, dQRel,
   }
@@ -57,17 +49,6 @@ export function computeStats(rows) {
 export default function Lab5Calc({ rows }) {
   const st = computeStats(rows)
   const has = rows.some((r) => r.kind === 'T') && rows.some((r) => r.kind === 'A')
-
-  const t1 = has
-    ? st.t10s.map((v, i) => ({ i: i + 1, t10: v, dev: st.dev[i], sq: st.sq[i] }))
-    : []
-  if (has) t1.push({ i: '', t10: '', dev: 'Σ', sq: st.sumSq, __sum: true })
-
-  const ampRow = has ? { ...st.A.reduce((acc, v, i) => ({ ...acc, [i]: v }), {}) } : null
-
-  const decRows = has
-    ? PAIRS.map(([i, j], k) => ({ i: k + 1, pair: `A${i} / A${j}`, Ai: st.A[i], Aj: st.A[j], d: st.deltas[k] }))
-    : []
 
   return (
     <>
@@ -80,72 +61,76 @@ export default function Lab5Calc({ rows }) {
 
       {has && (
         <>
-          <h4>Таблица 1. Обработка времени десяти колебаний</h4>
+          <h4>1. Вычисление значений по опытам</h4>
+          <p>
+            По времени десяти колебаний каждого опыта рассчитывается период{' '}
+            <Tex>{String.raw`T_i = t_{10,i}/${N_OSC}`}</Tex>.
+          </p>
           <DataTable
-            rows={t1}
+            rows={st.per}
             columns={[
               { key: 'i', label: '№' },
               { key: 't10', label: 't₁₀', unit: 'с', format: (v) => fmt(v, 2) },
-              { key: 'dev', label: 'Δt₁₀', unit: 'с', format: (v) => fmt(v, 3) },
-              { key: 'sq', label: '(Δt₁₀)²', unit: 'с²', format: (v) => fmt(v, 5) },
+              { key: 'T', label: 'Tᵢ = t₁₀/10', unit: 'с', format: (v) => fmt(v, 4) },
             ]}
           />
-          <p>Среднее время десяти колебаний и период:</p>
           <Subst
-            items={[
-              String.raw`\bar t_{10} = \frac{${st.t10s.map((v) => fmt(v, 2)).join(' + ')}}{${st.n}} = ${fmt(st.tMean, 3)}\ \text{с}`,
-              String.raw`T = \frac{\bar t_{10}}{${N_OSC}} = \frac{${fmt(st.tMean, 3)}}{${N_OSC}} = ${fmt(st.T, 3)}\ \text{с}`,
-            ]}
+            items={st.per.map((r) =>
+              String.raw`T_{${r.i}} = \frac{t_{10,${r.i}}}{${N_OSC}} = \frac{${fmt(r.t10, 2)}}{${N_OSC}} = ${fmt(r.T, 4)}\ \text{с}`
+            )}
           />
-          <p>
-            Случайная погрешность времени: <Tex>{String.raw`s_n = ${fmt(st.sn, 5)}\ \text{с}`}</Tex>,{' '}
-            <Tex>{String.raw`\Delta t_{\text{сл}} = ${fmt(st.tAlpha, 3)}\cdot s_n = ${fmt(st.dtSl, 5)}\ \text{с}`}</Tex>.
-            Полная погрешность <Tex>{String.raw`\Delta t_{10} = ${fmt(st.dt, 5)}\ \text{с}`}</Tex>,
-            поэтому <Tex>{String.raw`\Delta T = ${fmt(st.dT, 5)}\ \text{с}`}</Tex> (
-            <Tex>{String.raw`\delta_T = ${fmt(st.dTRel, 2)}\%`}</Tex>).
-          </p>
 
-          <h4>Таблица 2. Измеренные амплитуды</h4>
+          <h4>2. Средние значения и отклонения</h4>
+          <Eq>{String.raw`\bar T = \frac{1}{N}\sum_{i=1}^{N}T_i, \qquad \Delta T_i = \left|T_i - \bar T\right|`}</Eq>
+          <Subst
+            items={st.per.map((r, i) =>
+              String.raw`\left|T_{${i + 1}} - \bar T\right| = \left|${fmt(r.T, 4)} - ${fmt(st.TMean, 4)}\right| = ${fmt(st.tdev[i], 4)}\ \text{с}`
+            )}
+          />
+          <Eq>{String.raw`\bar T = \frac{${st.Ts.map((v) => fmt(v, 4)).join(' + ')}}{${st.Ts.length}} = ${fmt(st.TMean, 4)}\ \text{с}`}</Eq>
+
+          <h4>3. Средняя абсолютная погрешность периода</h4>
+          <Eq>{String.raw`\Delta T = \frac{1}{N}\sum_{i=1}^{N}\left|T_i - \bar T\right| = \frac{${st.tdev.map((v) => fmt(v, 4)).join(' + ')}}{${st.tdev.length}} = ${fmt(st.dT, 4)}\ \text{с}`}</Eq>
+
+          <h4>4. Относительная погрешность периода</h4>
+          <Eq>{String.raw`\delta_{\text{отн},T} = \frac{\Delta T}{\bar T}\cdot 100\% = ${fmt(st.dTRel, 2)}\%`}</Eq>
+
+          <h4>Логарифмический декремент: значения, среднее и погрешность</h4>
           <DataTable
-            rows={ampRow ? [ampRow] : []}
-            columns={Array.from({ length: 10 }, (_, i) => ({
-              key: String(i),
-              label: `A${i}`,
-              unit: 'град',
-              format: (v) => fmt(v, 2),
+            rows={PAIRS.map(([i, j], k) => ({
+              i: k + 1,
+              pair: `A${i} / A${j}`,
+              Ai: st.A[i],
+              Aj: st.A[j],
+              d: st.deltas[k],
+              dev: st.ddev[k],
             }))}
-            caption="Амплитуды снимаются через каждые полпериода"
-          />
-
-          <h4>Таблица 3. Логарифмический декремент затухания</h4>
-          <DataTable
-            rows={decRows}
             columns={[
               { key: 'i', label: '№' },
               { key: 'pair', label: 'Отношение', txt: true },
               { key: 'Ai', label: 'Aᵢ', unit: 'град', format: (v) => fmt(v, 2) },
               { key: 'Aj', label: 'Aⱼ', unit: 'град', format: (v) => fmt(v, 2) },
               { key: 'd', label: 'δᵢ', format: (v) => fmt(v, 4) },
+              { key: 'dev', label: '|δᵢ − δ̄|', format: (v) => fmt(v, 4) },
             ]}
           />
           <Subst
-            items={[
-              String.raw`\delta_1 = \ln\frac{${fmt(st.A[0], 2)}}{${fmt(st.A[2], 2)}} = ${fmt(st.deltas[0], 4)}`,
-              String.raw`\delta_2 = \ln\frac{${fmt(st.A[2], 2)}}{${fmt(st.A[4], 2)}} = ${fmt(st.deltas[1], 4)}`,
-              String.raw`\delta_3 = \ln\frac{${fmt(st.A[4], 2)}}{${fmt(st.A[6], 2)}} = ${fmt(st.deltas[2], 4)}`,
-              String.raw`\delta = \frac{\delta_1+\delta_2+\delta_3}{3} = ${fmt(st.delta, 4)}, \qquad \Delta\delta = ${fmt(st.dDelta, 4)}`,
-            ]}
+            items={PAIRS.map(([i, j], k) =>
+              String.raw`\delta_{${k + 1}} = \ln\frac{${fmt(st.A[i], 2)}}{${fmt(st.A[j], 2)}} = ${fmt(st.deltas[k], 4)}, \qquad \left|\delta_{${k + 1}}-\bar\delta\right| = ${fmt(st.ddev[k], 4)}`
+            )}
           />
+          <Eq>{String.raw`\bar\delta = \frac{${st.deltas.map((v) => fmt(v, 4)).join(' + ')}}{${st.deltas.length}} = ${fmt(st.delta, 4)}, \qquad \Delta\delta = \frac{${st.ddev.map((v) => fmt(v, 4)).join(' + ')}}{${st.ddev.length}} = ${fmt(st.dDelta, 4)}`}</Eq>
+          <Eq>{String.raw`\delta_{\text{отн},\delta} = \frac{\Delta\delta}{\bar\delta}\cdot 100\% = ${fmt(st.dDeltaRel, 2)}\%`}</Eq>
 
-          <h4>Таблица 4. Параметры затухающих колебаний</h4>
+          <h4>Итоговые параметры затухающих колебаний</h4>
           <DataTable
             rows={[
-              { p: 'Период T', v: `${fmt(st.T, 3)} с`, err: `±${fmt(st.dT, 3)} с (${fmt(st.dTRel, 2)} %)` },
-              { p: 'Логарифмический декремент δ', v: fmt(st.delta, 4), err: `±${fmt(st.dDelta, 4)} (${fmt(st.dDeltaRel, 2)} %)` },
-              { p: 'Коэффициент затухания β = δ/T', v: `${fmt(st.beta, 4)} с⁻¹`, err: `±${fmt(st.dBetaRel, 2)} %` },
+              { p: 'Период T', v: `${fmt(st.TMean, 4)} с`, err: `±${fmt(st.dT, 4)} с (${fmt(st.dTRel, 2)} %)` },
+              { p: 'Логарифмический декремент δ̄', v: fmt(st.delta, 4), err: `±${fmt(st.dDelta, 4)} (${fmt(st.dDeltaRel, 2)} %)` },
+              { p: 'Коэффициент затухания β = δ̄/T', v: `${fmt(st.beta, 4)} с⁻¹`, err: `±${fmt(st.dBetaRel, 2)} %` },
               { p: 'Время релаксации τ = 1/β', v: `${fmt(st.tau, 2)} с`, err: `±${fmt(st.dTauRel, 2)} %` },
               { p: 'Циклическая частота ω', v: `${fmt(st.omega, 3)} рад/с`, err: '—' },
-              { p: 'Добротность Q ≈ π/δ', v: fmt(st.Q, 1), err: `±${fmt(st.dQRel, 2)} %` },
+              { p: 'Добротность Q ≈ π/δ̄', v: fmt(st.Q, 1), err: `±${fmt(st.dQRel, 2)} %` },
             ]}
             columns={[
               { key: 'p', label: 'Величина', txt: true },
