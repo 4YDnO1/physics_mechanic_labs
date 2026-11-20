@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import LabShell from '../../components/LabShell.jsx'
+import { useLabState } from '../../utils/persist.js'
 import { Theory, Procedure, Conclusions } from './content.jsx'
 import Sim from './sim.jsx'
 import Calc, { computeStats } from './calc.jsx'
@@ -18,16 +18,8 @@ const VERSIONS = [
 ]
 
 export default function Lab4() {
-  const [rows, setRows] = useState([])
-  const [version, setVersion] = useState('web')
-  const addRow = (r) => setRows((prev) => [...prev, r])
+  const { rows, version, addRow, clearRows, changeVersion } = useLabState('lab6', VERSIONS)
   const stats = computeStats(rows, version)
-
-  const changeVersion = (v) => {
-    if (v === version) return
-    setRows([])
-    setVersion(v)
-  }
 
   return (
     <LabShell
@@ -42,7 +34,7 @@ export default function Lab4() {
       onVersion={changeVersion}
       theory={<Theory version={version} />}
       procedure={<Procedure version={version} />}
-      practice={<Sim key={version} version={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
+      practice={<Sim key={version} version={version} rows={rows} onResult={addRow} onClear={clearRows} />}
       calculations={<Calc version={version} rows={rows} />}
       conclusions={<Conclusions version={version} rows={rows} stats={stats} />}
     />

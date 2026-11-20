@@ -1,11 +1,11 @@
-import { useState } from 'react'
 import LabShell from '../../components/LabShell.jsx'
+import { usePersistentState } from '../../utils/persist.js'
 import { Theory, Procedure, Conclusions } from './content.jsx'
 import Sim from './sim.jsx'
 import Calc, { computeStats } from './calc.jsx'
 
 export default function Lab3() {
-  const [rows, setRows] = useState([])
+  const [rows, setRows] = usePersistentState('lab7:rows', [], Array.isArray)
   const addRow = (r) => setRows((prev) => [...prev, r])
   const stats = computeStats(rows)
 
