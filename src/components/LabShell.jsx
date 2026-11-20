@@ -39,9 +39,11 @@ export default function LabShell({
             Лабораторная работа №{number}. {title}
           </h2>
           {progress ? (
-            <div style={{ minWidth: 170 }}>
+            <div className="lh-progress">
               <div className="small dim">
-                Выполнено опытов: {progress.done} / {progress.total}
+                <span className="lh-progress-full">Выполнено опытов: </span>
+                <span className="lh-progress-short">Опыты: </span>
+                {progress.done} / {progress.total}
               </div>
               <progress className="progress" max={progress.total} value={progress.done} />
             </div>
