@@ -7,21 +7,21 @@ import Calc, { computeStats } from './calc.jsx'
 const VERSIONS = [
   {
     key: 'web',
-    label: 'Веб-вариант (дист. №1)',
-    hint: 'Момент инерции по числам оборотов n₁, n₂ (свободный выбег маховика).',
+    label: 'Веб-вариант',
+    hint: 'Кинематические характеристики по времени падения груза с высоты h.',
   },
   {
     key: 'print',
-    label: 'Печатный (очн. №2)',
-    hint: 'Момент инерции по высоте подъёма груза h₁ (методичка КНИТУ-КАИ).',
+    label: 'Печатный (очн. №1)',
+    hint: 'Очная методичка КНИТУ-КАИ: обработка прямых и косвенных измерений, 3 контрольных вопроса.',
   },
 ]
 
-export default function Lab1() {
+export default function Lab6() {
   const [rows, setRows] = useState([])
   const [version, setVersion] = useState('web')
   const addRow = (r) => setRows((prev) => [...prev, { ...r, i: prev.length + 1 }])
-  const stats = computeStats(rows, version)
+  const stats = computeStats(rows)
 
   const changeVersion = (v) => {
     if (v === version) return
@@ -32,18 +32,18 @@ export default function Lab1() {
   return (
     <LabShell
       number={1}
-      accent="#2563eb"
-      title="Определение момента инерции маховика методом вращения"
-      goal="определить момент инерции маховика."
-      equipment="виртуальная установка «Маховик»: маховик А, насаженный на вал с шарикоподшипниками, шкив В радиусом r, нить с грузом массы m, миллисекундомер и счётчик оборотов (встроены в модель)."
+      accent="#16a34a"
+      title="Определение кинематических параметров равнопеременного движения груза"
+      goal="определить кинематические характеристики (ускорение, скорость, угловую скорость и угловое ускорение) равнопеременного движения груза и оценить их погрешности."
+      equipment="виртуальная установка: маховик (блок) на оси со шкивом радиуса R, нить с грузом, измерительная линейка (высота h), секундомер и штангенциркуль (встроены в модель)."
       progress={{ done: rows.length, total: 5 }}
       versions={VERSIONS}
       version={version}
       onVersion={changeVersion}
       theory={<Theory version={version} />}
       procedure={<Procedure version={version} />}
-      practice={<Sim version={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
-      calculations={<Calc version={version} rows={rows} />}
+      practice={<Sim key={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
+      calculations={<Calc rows={rows} />}
       conclusions={<Conclusions version={version} rows={rows} stats={stats} />}
     />
   )

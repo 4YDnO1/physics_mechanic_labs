@@ -4,24 +4,50 @@ import { Theory, Procedure, Conclusions } from './content.jsx'
 import Sim from './sim.jsx'
 import Calc, { computeStats } from './calc.jsx'
 
-export default function Lab3() {
+const VERSIONS = [
+  {
+    key: 'web',
+    label: 'Веб-вариант (дист. №2)',
+    hint: 'Произвольные массы и начальный угол; скорости через sin(α/2).',
+  },
+  {
+    key: 'print',
+    label: 'Печатный (очн. №3)',
+    hint: 'Шары из набора 112 г и 40 г (равные или разные), угол α₁ = 10°; проверка импульса и энергии по углам.',
+  },
+]
+
+export default function Lab2() {
   const [rows, setRows] = useState([])
+  const [version, setVersion] = useState('web')
   const addRow = (r) => setRows((prev) => [...prev, r])
-  const stats = computeStats(rows)
+  const stats = computeStats(rows, version)
+  const done =
+    Math.min(5, rows.filter((r) => r.mode === 'elastic').length) +
+    Math.min(5, rows.filter((r) => r.mode === 'inelastic').length)
+
+  const changeVersion = (v) => {
+    if (v === version) return
+    setRows([])
+    setVersion(v)
+  }
 
   return (
     <LabShell
       number={3}
-      accent="#d97706"
-      title="Изучение законов вращательного движения твёрдого тела"
-      goal="проверка зависимости углового ускорения от момента силы при постоянном моменте инерции (маятник Обербека)."
-      equipment="виртуальная установка «Маятник Обербека»: крестовина из четырёх стержней с грузами K массой M, закрепляемыми на расстоянии R от оси; шкив радиусом r, нить, перекинутая через блок, груз массой m; миллисекундомер и счётчик оборотов (встроены в модель)."
-      progress={{ done: rows.length, total: 5 }}
-      theory={<Theory />}
-      procedure={<Procedure />}
-      practice={<Sim rows={rows} onResult={addRow} onClear={() => setRows([])} />}
-      calculations={<Calc rows={rows} />}
-      conclusions={<Conclusions rows={rows} stats={stats} />}
+      accent="#0d9488"
+      title="Проверка закона сохранения импульса"
+      goal="проверить закон сохранения импульса на примере абсолютно упругого и абсолютно неупругого удара шаров."
+      equipment="виртуальная установка «Удар шаров»: два маятника равной длины l = 0,5 м с шарами масс m₁ и m₂, электромагнит для удержания первого шара в отклонённом положении, шкала углов."
+      progress={{ done, total: 10 }}
+      versions={VERSIONS}
+      version={version}
+      onVersion={changeVersion}
+      theory={<Theory version={version} />}
+      procedure={<Procedure version={version} />}
+      practice={<Sim key={version} version={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
+      calculations={<Calc version={version} rows={rows} />}
+      conclusions={<Conclusions version={version} rows={rows} stats={stats} />}
     />
   )
 }

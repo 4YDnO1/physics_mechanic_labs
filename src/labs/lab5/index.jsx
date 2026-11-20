@@ -7,21 +7,21 @@ import Calc, { computeStats } from './calc.jsx'
 const VERSIONS = [
   {
     key: 'web',
-    label: 'Веб-вариант (дист. №5)',
-    hint: 'Плотности в кг/м³; погрешности отдельно по каждому материалу шарика.',
+    label: 'Веб-вариант',
+    hint: 'Виртуальный маятник: измерение времени 10 колебаний и амплитуд A₀…A₉.',
   },
   {
     key: 'print',
-    label: 'Печатный (очн. №4)',
-    hint: 'Плотности в кг/м³ и г/см³; коэффициент вязкости вычисляется по каждому опыту.',
+    label: 'Печатный (очн. №5)',
+    hint: 'Очная методичка: A₀ = 5°, 10 колебаний, три значения логарифмического декремента.',
   },
 ]
 
 export default function Lab5() {
   const [rows, setRows] = useState([])
   const [version, setVersion] = useState('web')
-  const addRow = (r) => setRows((prev) => [...prev, r])
-  const stats = computeStats(rows, version)
+  const addRow = (r) => setRows((prev) => [...prev, { ...r, i: prev.length + 1 }])
+  const stats = computeStats(rows)
 
   const changeVersion = (v) => {
     if (v === version) return
@@ -29,22 +29,26 @@ export default function Lab5() {
     setVersion(v)
   }
 
+  const periodCount = rows.filter((r) => r.kind === 'T').length
+  const ampCount = rows.filter((r) => r.kind === 'A').length
+  const done = Math.min(periodCount, 3) + Math.min(ampCount, 1)
+
   return (
     <LabShell
       number={5}
-      accent="#db2777"
-      title="Определение коэффициента вязкости жидкости методом Стокса"
-      goal="экспериментальное определение коэффициента вязкости двух жидкостей по измерению скорости равномерного падения шариков."
-      equipment="виртуальная установка: два сосуда с жидкостями (ρж1 = 1250 кг/м³, ρж2 = 900 кг/м³), набор металлических шариков (сталь, чугун, медь, латунь, алюминий, свинец, олово, цинк) радиусом 1–3 мм, секундомер (встроен в модель)."
-      progress={{ done: rows.length, total: 12 }}
+      accent="#ea580c"
+      title="Изучение механических затухающих колебаний"
+      goal="изучить процесс свободных затухающих колебаний при малых потерях энергии на примере механического маятника; определить период, логарифмический декремент, коэффициент затухания, время релаксации и добротность."
+      equipment="виртуальный физический маятник: стержень с диском-грузом на цилиндрическом шарнире, угловая шкала, секундомер (встроены в модель)."
+      progress={{ done, total: 4 }}
       versions={VERSIONS}
       version={version}
       onVersion={changeVersion}
       theory={<Theory version={version} />}
       procedure={<Procedure version={version} />}
       practice={<Sim key={version} version={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
-      calculations={<Calc version={version} rows={rows} />}
-      conclusions={<Conclusions version={version} rows={rows} stats={stats.byLiq} />}
+      calculations={<Calc rows={rows} />}
+      conclusions={<Conclusions rows={rows} stats={stats} />}
     />
   )
 }

@@ -6,6 +6,7 @@ import { G, noisePct, fmt } from '../../utils/stats.js'
 
 const J_TRUE = 0.02
 const MF = 0.015
+const M_LOAD = 0.2
 
 const R_OPTS = [
   { value: 0.04, label: '0,04 м' },
@@ -13,43 +14,27 @@ const R_OPTS = [
   { value: 0.06, label: '0,06 м' },
 ]
 
-function kin(r, h, m) {
-  const a1 = (r * (m * G * r - MF)) / (J_TRUE + m * r * r)
-  const tFall = Math.sqrt((2 * h) / a1)
-  const wEnd = (a1 * tFall) / r
-  const eps2 = MF / J_TRUE
-  const tStop = wEnd / eps2
-  const a2 = (r * (m * G * r + MF)) / (J_TRUE + m * r * r)
-  const h1 = h * (a1 / a2)
-  return { a1, tFall, wEnd, eps2, tStop, a2, h1 }
+function kin(R, h) {
+  const a = (R * (M_LOAD * G * R - MF)) / (J_TRUE + M_LOAD * R * R)
+  const t = Math.sqrt((2 * h) / a)
+  const v = a * t
+  return { a, t, v, w: v / R, eps: a / R }
 }
 
-export default function Lab1Sim({ version, rows, onResult, onClear }) {
-  const isPrint = version === 'print'
-  const [r, setR] = useState(0.05)
+export default function Lab6Sim({ rows, onResult, onClear }) {
+  const [R, setR] = useState(0.05)
   const [h, setH] = useState(1.5)
-  const [m, setM] = useState(0.2)
   const [speed, setSpeed] = useState(3)
   const [phase, setPhase] = useState('idle')
-  const [live, setLive] = useState({ t: 0, x: 0, w: 0 })
+  const [live, setLive] = useState({ t: 0, x: 0 })
   const sim = useRef({ phase: 'idle' })
   const cnv = useRef(null)
   const acc = useRef(0)
 
   const prepare = () => {
-    sim.current = {
-      phase: 'ready',
-      t: 0,
-      theta: 0,
-      omega: 0,
-      x: 0,
-      tau: 0,
-      k: kin(r, h, m),
-      p: { r, h, m },
-      rec: null,
-    }
+    sim.current = { phase: 'ready', t: 0, x: 0, k: kin(R, h), p: { R, h } }
     setPhase('ready')
-    setLive({ t: 0, x: 0, w: 0 })
+    setLive({ t: 0, x: 0 })
   }
 
   const start = () => {
@@ -65,58 +50,21 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
       const spd = speed
       if (s.phase === 'fall') {
         s.t += dt * spd
-        s.x = 0.5 * s.k.a1 * s.t * s.t
-        s.theta = s.x / s.p.r
-        s.omega = (s.k.a1 * s.t) / s.p.r
+        s.x = 0.5 * s.k.a * s.t * s.t
         if (s.x >= s.p.h) {
           s.x = s.p.h
-          s.t = s.k.tFall
-          s.tFall = s.k.tFall
-          const tMeas = +(s.k.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2)
-          if (isPrint) {
-            s.rec = { t: tMeas }
-            s.phase = 'rebound'
-            s.tau = 0
-            s.omega = s.k.wEnd
-            setPhase('rebound')
-          } else {
-            const n1True = s.p.h / (2 * Math.PI * s.p.r)
-            s.rec = { t: tMeas, n1: +(n1True * noisePct(0.004)).toFixed(1) }
-            s.phase = 'spin'
-            s.omega = s.k.wEnd
-            setPhase('spin')
-          }
-        }
-      } else if (s.phase === 'rebound') {
-        s.tau += dt * spd
-        const rise = 0.5 * s.k.a2 * s.tau * s.tau
-        s.x = Math.max(s.p.h - rise, 0)
-        s.omega = Math.max(s.k.wEnd - (s.k.a2 / s.p.r) * s.tau, 0)
-        if (rise >= s.k.h1) {
-          s.x = s.p.h - s.k.h1
-          s.omega = 0
+          s.t = s.k.t
           s.phase = 'done'
-          s.rec.h1 = +(s.k.h1 * noisePct(0.006)).toFixed(3)
-          onResult({ ...s.p, t: s.rec.t, h1: s.rec.h1 })
-          setPhase('done')
-        }
-      } else if (s.phase === 'spin') {
-        s.omega -= s.k.eps2 * dt * spd
-        s.theta += s.omega * dt * spd
-        if (s.omega <= 0) {
-          s.omega = 0
-          s.phase = 'done'
-          const n2True = (s.theta - s.p.h / s.p.r) / (2 * Math.PI)
-          s.rec.n2 = +(n2True * noisePct(0.004)).toFixed(1)
-          onResult({ ...s.p, t: s.rec.t, n1: s.rec.n1, n2: s.rec.n2 })
+          const tMeas = +(s.k.t * noisePct(0.004)).toFixed(3)
+          onResult({ ...s.p, t: tMeas })
           setPhase('done')
         }
       }
-      draw(ctx, s, version)
+      draw(ctx, s)
       acc.current += dt
       if (acc.current > 0.1) {
         acc.current = 0
-        setLive({ t: s.tFall ?? s.t, x: s.x || 0, w: s.omega })
+        setLive({ t: s.t, x: s.x || 0 })
       }
     },
     true
@@ -125,32 +73,12 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
   const statusText = {
     idle: 'Установка не подготовлена. Задайте параметры и нажмите «Подготовить».',
     ready: 'Груз поднят на высоту h. Нажмите «Старт».',
-    fall: 'Падение груза — маховик раскручивается…',
-    spin: 'Свободный выбег маховика после касания грузом пола…',
-    rebound: 'Нить наматывается обратно — груз поднимается на высоту h₁…',
-    done: 'Опыт завершён. Результаты занесены в таблицу.',
+    fall: 'Груз опускается — измеряется время падения…',
+    done: 'Опыт завершён. Результат занесён в таблицу.',
   }[phase]
 
-  const columns = isPrint
-    ? [
-        { key: 'i', label: '№' },
-        { key: 'm', label: 'm', unit: 'кг' },
-        { key: 'r', label: 'r', unit: 'м' },
-        { key: 'h', label: 'h', unit: 'м' },
-        { key: 'h1', label: 'h₁', unit: 'м' },
-        { key: 't', label: 't', unit: 'с' },
-      ]
-    : [
-        { key: 'i', label: '№' },
-        { key: 'm', label: 'm', unit: 'кг' },
-        { key: 'r', label: 'r', unit: 'м' },
-        { key: 'h', label: 'h', unit: 'м' },
-        { key: 't', label: 't', unit: 'с' },
-        { key: 'n1', label: 'n₁', unit: 'об' },
-        { key: 'n2', label: 'n₂', unit: 'об' },
-      ]
-
   const last = rows[rows.length - 1]
+  const kk = kin(R, h)
 
   return (
     <div className="practice">
@@ -159,29 +87,25 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
           <Canvas canvasRef={cnv} />
           <div className="sim-status">
             <span className="readout">
-              t<b>{fmt(live.t, 2)} с</b>
+              t<b>{fmt(live.t, 3)} с</b>
             </span>
-            {isPrint ? (
-              <span className="readout">
-                h<b>{fmt(live.x, 2)} м</b>
-              </span>
-            ) : (
-              <span className="readout">
-                n<b>{fmt(live.x / (2 * Math.PI * (sim.current.p?.r ?? r)), 1)} об</b>
-              </span>
-            )}
             <span className="readout">
-              ω<b>{fmt(live.w, 1)} рад/с</b>
+              h<b>{fmt(live.x, 2)} м</b>
             </span>
             <span>{statusText}</span>
           </div>
         </div>
         <div style={{ marginTop: 14 }}>
-          <h4>Таблица результатов</h4>
+          <h4>Таблица 1. Результаты измерений времени</h4>
           <DataTable
             rows={rows}
-            columns={columns}
-            caption="Радиус шкива r, высота падения h и масса груза m задаются перед каждым опытом"
+            columns={[
+              { key: 'i', label: '№' },
+              { key: 'h', label: 'h', unit: 'м' },
+              { key: 'R', label: 'R', unit: 'м' },
+              { key: 't', label: 't', unit: 'с', format: (v) => fmt(v, 3) },
+            ]}
+            caption="Высота h и радиус шкива R неизменны в ходе серии опытов"
           />
         </div>
       </div>
@@ -189,14 +113,13 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
       <div className="ctrl-col">
         <div className="ctrl-card">
           <h5>Параметры установки</h5>
-          <Select label="Радиус шкива r" value={r} onChange={(v) => setR(+v)} options={R_OPTS} />
+          <Select label="Радиус шкива R" value={R} onChange={(v) => setR(+v)} options={R_OPTS} />
           <Slider label="Высота падения h" value={h} onChange={setH} min={0.8} max={2} step={0.05} unit="м" digits={2} />
-          <Slider label="Масса груза m" value={m} onChange={setM} min={0.1} max={0.5} step={0.01} unit="кг" digits={2} />
         </div>
         <div className="ctrl-card">
           <h5>Управление</h5>
           <div className="btn-row">
-            <Btn onClick={prepare} disabled={phase === 'fall' || phase === 'spin' || phase === 'rebound'}>
+            <Btn onClick={prepare} disabled={phase === 'fall'}>
               Подготовить
             </Btn>
             <Btn onClick={start} disabled={phase !== 'ready'}>
@@ -205,22 +128,20 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
           </div>
           <Slider label="Скорость анимации" value={speed} onChange={setSpeed} min={1} max={10} step={1} unit="×" digits={0} />
           <div className="small dim" style={{ marginTop: 6 }}>
-            Скорость влияет только на ход модели по времени, измеряемые значения соответствуют
-            реальному времени процесса.
+            Скорость влияет только на ход анимации, измеряемое время соответствует реальному
+            процессу.
           </div>
         </div>
         <div className="ctrl-card">
-          <h5>Измеряемые величины</h5>
+          <h5>Кинематические характеристики</h5>
           <div className="readouts">
-            <Readout label="t — время падения" value={last ? fmt(last.t, 2) : '—'} unit="с" hl />
-            {isPrint ? (
-              <Readout label="h₁ — высота подъёма" value={last ? fmt(last.h1, 3) : '—'} unit="м" />
-            ) : (
-              <>
-                <Readout label="n₁ — оборотов при падении" value={last ? fmt(last.n1, 1) : '—'} unit="об" />
-                <Readout label="n₂ — оборотов до остановки" value={last ? fmt(last.n2, 1) : '—'} unit="об" />
-              </>
-            )}
+            <Readout label="a = 2h/t²" value={fmt(kk.a, 3)} unit="м/с²" hl />
+            <Readout label="v = at" value={fmt(kk.v, 2)} unit="м/с" />
+            <Readout label="ω = v/R" value={fmt(kk.w, 2)} unit="рад/с" />
+            <Readout label="ε = a/R" value={fmt(kk.eps, 2)} unit="рад/с²" />
+          </div>
+          <div className="small dim" style={{ marginTop: 4 }}>
+            Приведены теоретические значения для заданных h и R.
           </div>
           {rows.length > 0 && (
             <div className="btn-row">
@@ -235,13 +156,11 @@ export default function Lab1Sim({ version, rows, onResult, onClear }) {
   )
 }
 
-function draw(ctx, s, version) {
+function draw(ctx, s) {
   bg(ctx)
-  const cx = 235
-  const cy = 168
-  const Rf = 106
-  const Rp = 38
-  const isPrint = version === 'print'
+  const cx = 300
+  const cy = 120
+  const Rp = 46
 
   ctx.fillStyle = '#e7ebf2'
   ctx.fillRect(0, 436, 780, 34)
@@ -250,45 +169,11 @@ function draw(ctx, s, version) {
   ctx.strokeStyle = '#90a0bb'
   ctx.lineWidth = 9
   ctx.beginPath()
-  ctx.moveTo(cx - 52, cy + 24)
-  ctx.lineTo(cx - 84, 432)
-  ctx.moveTo(cx + 52, cy + 24)
-  ctx.lineTo(cx + 84, 432)
+  ctx.moveTo(cx + 30, cy)
+  ctx.lineTo(cx + 150, cy)
   ctx.stroke()
+  line(ctx, cx + 148, cy - 40, cx + 148, cy + 40, '#90a0bb', 9)
 
-  const th = s.theta || 0
-  ctx.save()
-  ctx.translate(cx, cy)
-  ctx.rotate(th)
-  ctx.strokeStyle = '#7c8db0'
-  ctx.lineWidth = 11
-  for (let i = 0; i < 6; i++) {
-    const a = (i * Math.PI) / 3
-    ctx.beginPath()
-    ctx.moveTo(Math.cos(a) * 18, Math.sin(a) * 18)
-    ctx.lineTo(Math.cos(a) * 96, Math.sin(a) * 96)
-    ctx.stroke()
-  }
-  ctx.strokeStyle = '#5b6c8f'
-  ctx.lineWidth = 15
-  ctx.beginPath()
-  ctx.arc(0, 0, Rf - 4, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.strokeStyle = '#48597c'
-  ctx.lineWidth = 4
-  ctx.beginPath()
-  ctx.arc(0, 0, Rf + 4, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.fillStyle = '#e05252'
-  ctx.beginPath()
-  ctx.arc(0, Rf - 4, 5, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.restore()
-
-  ctx.fillStyle = '#48597c'
-  ctx.beginPath()
-  ctx.arc(cx, cy, 16, 0, Math.PI * 2)
-  ctx.fill()
   ctx.fillStyle = '#aeb9cf'
   ctx.beginPath()
   ctx.arc(cx, cy, Rp, 0, Math.PI * 2)
@@ -298,46 +183,42 @@ function draw(ctx, s, version) {
   ctx.beginPath()
   ctx.arc(cx, cy, Rp, 0, Math.PI * 2)
   ctx.stroke()
+  const th = s.phase === 'idle' || s.phase === 'ready' ? 0 : (s.x || 0) / (s.p?.R || 0.05)
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(th)
   ctx.strokeStyle = '#8b95ac'
-  ctx.lineWidth = 1.5
+  ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.arc(cx, cy, Rp - 7, 0, Math.PI * 2)
+  ctx.moveTo(0, 0)
+  ctx.lineTo(0, Rp - 6)
+  ctx.moveTo(0, 0)
+  ctx.lineTo(Rp - 6, 0)
   ctx.stroke()
+  ctx.restore()
+  label(ctx, 'R', cx + Rp + 8, cy - 6, 14, '#44506b')
+  label(ctx, 'А', cx - Rp - 18, cy - Rp + 12, 15, '#44506b')
 
-  label(ctx, 'А', cx - Rf - 16, cy - Rf + 10, 15, '#44506b')
-  label(ctx, 'В', cx + Rp + 10, cy + 6, 15, '#44506b')
-
-  const y0 = cy + Rp
-  const wTop0 = y0 + 8
   const floorLineY = 436
-  const wH = 46
+  const wH = 40
+  const wTop0 = cy + Rp + 6
   const drop = floorLineY - wH - wTop0
   const hh = s.p?.h || 1.5
   const xx = s.phase === 'idle' || s.phase === 'ready' ? 0 : s.x || 0
   const wTop = Math.min(wTop0 + (xx / hh) * drop, floorLineY - wH)
 
-  ctx.strokeStyle = '#6b5b45'
-  ctx.lineWidth = 2.2
-  ctx.beginPath()
-  ctx.moveTo(cx, y0)
-  if (!isPrint && (s.phase === 'spin' || s.phase === 'done')) {
-    ctx.quadraticCurveTo(cx + 30, (y0 + floorLineY) / 2, cx, floorLineY - wH)
-  } else {
-    ctx.lineTo(cx, wTop)
-  }
-  ctx.stroke()
+  line(ctx, cx, cy + Rp - 2, cx, wTop, '#6b5b45', 2.2)
 
   ctx.fillStyle = '#3f4f78'
   ctx.fillRect(cx - 16, wTop, 32, 10)
-  const gh = 36
   const gg = ctx.createLinearGradient(cx - 16, 0, cx + 16, 0)
   gg.addColorStop(0, '#8e9a6f')
   gg.addColorStop(1, '#5d6b45')
   ctx.fillStyle = gg
-  ctx.fillRect(cx - 16, wTop + 10, 32, gh)
-  label(ctx, 'm', cx + 24, wTop + gh / 2 + 12, 14, '#44506b')
+  ctx.fillRect(cx - 16, wTop + 10, 32, wH - 10)
+  label(ctx, 'm', cx + 24, wTop + wH / 2 + 6, 14, '#44506b')
 
-  const rx = 480
+  const rx = 560
   line(ctx, rx, wTop0, rx, floorLineY - wH, '#9aa7bd', 2)
   for (let i = 0; i <= 4; i++) {
     const yy = wTop0 + (drop * i) / 4
@@ -346,13 +227,5 @@ function draw(ctx, s, version) {
   }
   label(ctx, 'h, м', rx - 10, wTop0 - 8, 12, '#77839d', 'right')
 
-  label(ctx, `r = ${fmt(s.p?.r ?? 0.05, 2)} м   h = ${fmt(hh, 2)} м   m = ${fmt(s.p?.m ?? 0.2, 2)} кг`, 22, 30, 13.5, '#44506b')
-
-  if (s.phase === 'spin' || s.phase === 'fall' || s.phase === 'rebound') {
-    ctx.strokeStyle = '#d97706'
-    ctx.lineWidth = 3
-    ctx.beginPath()
-    ctx.arc(cx, cy, Rf + 22, th % (2 * Math.PI) - 0.5, th % (2 * Math.PI) + 0.2)
-    ctx.stroke()
-  }
+  label(ctx, `R = ${fmt(s.p?.R ?? 0.05, 2)} м   h = ${fmt(hh, 2)} м`, 22, 30, 13.5, '#44506b')
 }

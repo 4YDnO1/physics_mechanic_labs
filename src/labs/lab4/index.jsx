@@ -7,17 +7,17 @@ import Calc, { computeStats } from './calc.jsx'
 const VERSIONS = [
   {
     key: 'web',
-    label: 'Веб-вариант (дист. №4)',
-    hint: 'Ускорение по двум участкам: S₁ и S₂; рабочая формула (10).',
+    label: 'Веб-вариант (дист. №5)',
+    hint: 'Плотности в кг/м³; погрешности отдельно по каждому материалу шарика.',
   },
   {
     key: 'print',
-    label: 'Печатный (очн. №6)',
-    hint: 'Ускорение по пути S за время t; рабочая формула (5).',
+    label: 'Печатный (очн. №4)',
+    hint: 'Плотности в кг/м³ и г/см³; коэффициент вязкости вычисляется по каждому опыту.',
   },
 ]
 
-export default function Lab4() {
+export default function Lab5() {
   const [rows, setRows] = useState([])
   const [version, setVersion] = useState('web')
   const addRow = (r) => setRows((prev) => [...prev, r])
@@ -32,11 +32,11 @@ export default function Lab4() {
   return (
     <LabShell
       number={4}
-      accent="#7c3aed"
-      title="Изучение законов динамики поступательного движения тел с помощью машины Атвуда"
-      goal="экспериментальная проверка законов равноускоренного и равномерного движения и определение ускорения свободного падения."
-      equipment="виртуальная установка «Машина Атвуда»: блок с нитью, два груза массой M = 0,2 кг, перегрузок массой m, уловитель перегрузка (отметка S₁ = 0,3 м), участок равномерного движения S₂ = 0,5 м, миллисекундомер (встроен в модель)."
-      progress={{ done: rows.length, total: 5 }}
+      accent="#db2777"
+      title="Определение коэффициента вязкости жидкости методом Стокса"
+      goal="экспериментальное определение коэффициента вязкости двух жидкостей по измерению скорости равномерного падения шариков."
+      equipment="виртуальная установка: два сосуда с жидкостями (ρж1 = 1250 кг/м³, ρж2 = 900 кг/м³), набор металлических шариков (сталь, чугун, медь, латунь, алюминий, свинец, олово, цинк) радиусом 1–3 мм, секундомер (встроен в модель)."
+      progress={{ done: rows.length, total: 12 }}
       versions={VERSIONS}
       version={version}
       onVersion={changeVersion}
@@ -44,7 +44,7 @@ export default function Lab4() {
       procedure={<Procedure version={version} />}
       practice={<Sim key={version} version={version} rows={rows} onResult={addRow} onClear={() => setRows([])} />}
       calculations={<Calc version={version} rows={rows} />}
-      conclusions={<Conclusions version={version} rows={rows} stats={stats} />}
+      conclusions={<Conclusions version={version} rows={rows} stats={stats.byLiq} />}
     />
   )
 }

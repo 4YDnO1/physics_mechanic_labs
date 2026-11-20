@@ -1,147 +1,175 @@
 import { useRef, useState } from 'react'
-import { Canvas, useSimLoop, bg, line, label, ball } from '../../utils/canvas.jsx'
-import { Btn, Num, Readout, Radio, Select, Slider } from '../../components/controls.jsx'
+import { Canvas, useSimLoop, bg, line, label, ball, stand } from '../../utils/canvas.jsx'
+import { Btn, Radio, Readout, Slider } from '../../components/controls.jsx'
 import DataTable from '../../components/DataTable.jsx'
-import { G, fmt, noisePct } from '../../utils/stats.js'
-import { BALLS, LIQUIDS, H_BOTTOM } from './content.jsx'
+import { fmt, noisePct } from '../../utils/stats.js'
+import { N_OSC } from './content.jsx'
 
-const SURF_Y = 104
-const BOT_Y = 442
-const PX = (BOT_Y - SURF_Y) / 0.5
+const G = 9.81
+const L = 0.8
 
-export default function Lab5Sim({ rows, onResult, onClear }) {
-  const [vessel, setVessel] = useState('1')
-  const [mat, setMat] = useState('0')
-  const [r, setR] = useState(0.002)
-  const [h1, setH1] = useState(0.1)
-  const [h2, setH2] = useState(0.1)
-  const [speed, setSpeed] = useState(8)
+function makeParams(A0, beta) {
+  const omega0 = Math.sqrt(G / L)
+  const omega = Math.sqrt(Math.max(0.0001, omega0 * omega0 - beta * beta))
+  const T = (2 * Math.PI) / omega
+  return { A0, beta, omega0, omega, T }
+}
+
+function draw(ctx, s, p, mode) {
+  bg(ctx)
+  const theta = ((p.A0 * Math.exp(-p.beta * s.t) * Math.cos(p.omega * s.t)) * Math.PI) / 180
+  const px = 200
+  const py = 80
+  const len = 315
+
+  stand(ctx, px, py - 26, py + 34)
+  line(ctx, px, py, px, py + len, '#cbd5e1', 1.2)
+  ctx.save()
+  ctx.setLineDash([6, 5])
+  line(ctx, px - 90, py + len + 26, px + 90, py + len + 26, '#94a3b8', 1)
+  ctx.restore()
+
+  const bx = px + len * Math.sin(theta)
+  const by = py + len * Math.cos(theta)
+  line(ctx, px, py, bx, by, '#475569', 3)
+  ctx.fillStyle = '#1e293b'
+  ctx.beginPath()
+  ctx.arc(px, py, 7, 0, Math.PI * 2)
+  ctx.fill()
+  ball(ctx, bx, by, 34, { light: '#fb923c', dark: '#c2410c' })
+
+  label(ctx, '0°', px + 8, py + len + 24, 12)
+  label(ctx, `${fmt(p.A0, 1)}°`, px + len * Math.sin((p.A0 * Math.PI) / 180) + 8, py + len * Math.cos((p.A0 * Math.PI) / 180), 12, '#b45309')
+  label(ctx, `−${fmt(p.A0, 1)}°`, px - len * Math.sin((p.A0 * Math.PI) / 180) - 52, py + len * Math.cos((p.A0 * Math.PI) / 180), 12, '#b45309')
+
+  const gx = 430
+  const gy = 64
+  const gw = 322
+  const gh = 330
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(gx, gy, gw, gh)
+  ctx.strokeStyle = '#d8dee9'
+  ctx.lineWidth = 1
+  ctx.strokeRect(gx, gy, gw, gh)
+
+  const tEnd = s.total || N_OSC * p.T
+  const yAmp = p.A0 * 1.15
+  const X = (t) => gx + (t / tEnd) * gw
+  const Y = (v) => gy + gh / 2 - (v / yAmp) * (gh / 2)
+
+  line(ctx, gx, Y(0), gx + gw, Y(0), '#94a3b8', 1)
+  ctx.save()
+  ctx.setLineDash([5, 5])
+  line(ctx, X(0), Y(p.A0), X(tEnd), Y(p.A0), '#f59e0b', 1.2)
+  line(ctx, X(0), Y(-p.A0), X(tEnd), Y(-p.A0), '#f59e0b', 1.2)
+  ctx.restore()
+  label(ctx, '+A₀', gx + 4, Y(p.A0) - 5, 11, '#b45309')
+  label(ctx, '−A₀', gx + 4, Y(-p.A0) + 14, 11, '#b45309')
+
+  const shown = Math.min(s.t, tEnd)
+  ctx.strokeStyle = mode === 'period' ? '#ea580c' : '#2563eb'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  for (let i = 0; i <= 260; i++) {
+    const t = (shown * i) / 260
+    const v = p.A0 * Math.exp(-p.beta * t) * Math.cos(p.omega * t)
+    if (i === 0) ctx.moveTo(X(t), Y(v))
+    else ctx.lineTo(X(t), Y(v))
+  }
+  ctx.stroke()
+
+  const cur = p.A0 * Math.exp(-p.beta * shown) * Math.cos(p.omega * shown)
+  ctx.fillStyle = mode === 'period' ? '#ea580c' : '#2563eb'
+  ctx.beginPath()
+  ctx.arc(X(shown), Y(cur), 4, 0, Math.PI * 2)
+  ctx.fill()
+  label(ctx, 't, с', gx + gw - 24, gy + gh + 18, 12)
+  label(ctx, 'x, град', gx - 38, gy + 16, 12)
+  label(ctx, fmt(tEnd, 1), gx + gw - 12, Y(0) + 16, 11, '#64748b')
+}
+
+export default function Lab5Sim({ version, rows, onResult, onClear }) {
+  const isPrint = version === 'print'
+  const [mode, setMode] = useState('period')
+  const [A0, setA0] = useState(isPrint ? 5 : 6)
+  const [beta, setBeta] = useState(0.07)
+  const [speed, setSpeed] = useState(4)
   const [phase, setPhase] = useState('idle')
-  const [live, setLive] = useState({ a: 0, v: 0, t: null })
-  const sim = useRef({ phase: 'idle' })
+  const [live, setLive] = useState({ t: 0, x: 0 })
+  const sim = useRef({ phase: 'idle', t: 0, total: 0, done: false, p: null })
   const cnv = useRef(null)
   const acc = useRef(0)
 
-  const liq = LIQUIDS[+vessel - 1]
-  const bm = BALLS[+mat]
-  const h = vessel === '1' ? h1 : h2
-  const l = H_BOTTOM - h
+  const p = makeParams(A0, beta)
+  const total = mode === 'period' ? N_OSC * p.T : (9 * p.T) / 2 + 0.02
 
-  const drop = () => {
-    const rhoS = bm.rho
-    const rhoL = liq.rho
-    const a0 = (G * (rhoS - rhoL)) / rhoS
-    const tau = (2 * rhoS * r * r) / (9 * liq.eta)
+  const prepare = () => {
+    const pp = makeParams(A0, beta)
     sim.current = {
-      phase: 'fall',
+      phase: 'ready',
       t: 0,
-      y: 0,
-      v: 0,
-      a0,
-      tau,
-      hh: h,
-      vsl: +vessel,
-      p: { vessel: +vessel, name: bm.name, rhoS, rhoL, r, h, l },
-      started: false,
+      total: mode === 'period' ? N_OSC * pp.T : (9 * pp.T) / 2 + 0.02,
+      done: false,
+      p: pp,
     }
-    setPhase('fall')
-    setLive({ a: a0, v: 0, t: null })
+    setPhase('ready')
+    setLive({ t: 0, x: A0 })
   }
 
-  const reset = () => {
-    sim.current.phase = 'idle'
-    setPhase('idle')
-    setLive({ a: 0, v: 0, t: null })
+  const start = () => {
+    if (sim.current.phase !== 'ready') return
+    sim.current.phase = 'run'
+    setPhase('run')
   }
 
   useSimLoop(
     cnv,
     (dt, ctx) => {
       const s = sim.current
-      if (s.phase === 'fall') {
-        // Точное решение уравнения dv/dt = a0 - v/tau (метод не зависит от шага):
-        // v(d) = vInf + (v - vInf)·e^(-d/tau);  y(d) = y + vInf·d + (v - vInf)·tau·(1 - e^(-d/tau)),
-        // поэтому записываемое время t НЕ зависит от скорости демонстрации.
-        const vi = s.a0 * s.tau
-        const yAt = (d) => s.y + vi * d + (s.v - vi) * s.tau * (1 - Math.exp(-d / s.tau))
-        const adv = (d) => {
-          const e = Math.exp(-d / s.tau)
-          s.y += vi * d + (s.v - vi) * s.tau * (1 - e)
-          s.v = vi + (s.v - vi) * e
-        }
-        const timeTo = (target, lim) => {
-          if (yAt(lim) < target) return null
-          let lo = 0
-          let hi = lim
-          for (let i = 0; i < 40; i++) {
-            const mid = (lo + hi) / 2
-            if (yAt(mid) < target) lo = mid
-            else hi = mid
-          }
-          return (lo + hi) / 2
-        }
-        let rem = dt * speed
-        while (rem > 1e-9 && s.phase === 'fall') {
-          if (!s.started) {
-            const d1 = timeTo(s.hh, rem)
-            if (d1 == null) {
-              adv(rem)
-              break
+      const pp = s.p || p
+      if (s.phase === 'run') {
+        s.t += dt * speed
+        if (s.t >= s.total) {
+          s.t = s.total
+          if (!s.done) {
+            s.done = true
+            if (mode === 'period') {
+              onResult({
+                kind: 'T',
+                t10: +(N_OSC * pp.T * noisePct(0.003)).toFixed(2),
+                A0: pp.A0,
+              })
+            } else {
+              const A = Array.from({ length: 10 }, (_, i) =>
+                i === 0 ? pp.A0 : +(pp.A0 * Math.exp((-pp.beta * i * pp.T) / 2) * noisePct(0.012)).toFixed(2)
+              )
+              onResult({ kind: 'A', A })
             }
-            adv(d1)
-            s.started = true
-            s.t = 0
-            rem -= d1
-          } else {
-            const d2 = timeTo(H_BOTTOM, rem)
-            if (d2 == null) {
-              adv(rem)
-              s.t += rem
-              break
-            }
-            adv(d2)
-            s.t += d2
-            s.y = H_BOTTOM
-            s.phase = 'done'
-            const tm = +(s.t * noisePct(0.006)).toFixed(2)
-            onResult({ ...s.p, t: tm })
-            setPhase('done')
           }
+          setPhase('done')
         }
       }
-      draw(ctx, s, { vessel, h1, h2, mat, r })
+      const x = pp.A0 * Math.exp(-pp.beta * s.t) * Math.cos(pp.omega * s.t)
+      draw(ctx, s, pp, mode)
       acc.current += dt
-      if (acc.current > 0.08) {
+      if (acc.current > 0.1) {
         acc.current = 0
-        const a = s.phase === 'fall' ? s.a0 - s.v / s.tau : s.phase === 'done' ? 0 : 0
-        setLive({ a: s.phase === 'idle' ? 0 : a, v: s.v || 0, t: s.started ? s.t : null })
+        setLive({ t: s.t, x })
       }
     },
     true
   )
 
-  const statusText = {
-    idle: 'Выберите сосуд, материал и радиус шарика, затем нажмите «Бросить шарик».',
-    fall: 'Шарик тонет: следите за ускорением a — оно стремится к нулю (равномерное движение).',
-    done: 'Шарик дошёл до нижней метки. Время t занесено в таблицу.',
-  }[phase]
+  const periodRows = rows.filter((r) => r.kind === 'T')
+  const ampRows = rows.filter((r) => r.kind === 'A')
+  const lastAmp = ampRows[ampRows.length - 1]
 
-  const t1rows = rows.filter((rw) => rw.vessel === 1)
-  const t2rows = rows.filter((rw) => rw.vessel === 2)
-  const curRows = rows.filter((rw) => rw.vessel === +vessel)
-  const curName = bm.name
-  const curCount = curRows.filter((rw) => rw.name === curName).length
-  const matsCount = new Set(curRows.map((rw) => rw.name)).size
-  const tblCols = [
-    { key: 'i', label: '№' },
-    { key: 'name', label: 'Шарик', txt: true },
-    { key: 'rhoS', label: 'ρш', unit: 'кг/м³', format: (v) => fmt(v, 0) },
-    { key: 'rhoL', label: 'ρж', unit: 'кг/м³', format: (v) => fmt(v, 0) },
-    { key: 'r', label: 'r', unit: 'м' },
-    { key: 'h', label: 'h', unit: 'м' },
-    { key: 'l', label: 'l', unit: 'м' },
-    { key: 't', label: 't', unit: 'с' },
-  ]
+  const statusText = {
+    idle: 'Выберите режим, задайте параметры и нажмите «Подготовить».',
+    ready: 'Маятник отклонён. Нажмите «Старт» для измерения.',
+    run: mode === 'period' ? 'Идёт отсчёт 10 колебаний…' : 'Регистрируются амплитуды A₀…A₉…',
+    done: 'Опыт завершён, результат занесён в таблицу.',
+  }[phase]
 
   return (
     <div className="practice">
@@ -150,159 +178,81 @@ export default function Lab5Sim({ rows, onResult, onClear }) {
           <Canvas canvasRef={cnv} />
           <div className="sim-status">
             <span className="readout">
-              a<b>{fmt(live.a, 3)} м/с²</b>
+              t<b>{fmt(live.t, 2)} с</b>
             </span>
             <span className="readout">
-              ν<b>{fmt(live.v, 3)} м/с</b>
-            </span>
-            <span className="readout">
-              t<b>{live.t == null ? '—' : fmt(live.t, 2) + ' с'}</b>
+              x<b>{fmt(live.x, 2)}°</b>
             </span>
             <span>{statusText}</span>
           </div>
         </div>
         <div style={{ marginTop: 14 }}>
-          <div>
-            <h4>Таблица 1. Жидкость №1</h4>
-            <DataTable
-              rows={t1rows.map((rw, i) => ({ ...rw, i: i + 1 }))}
-              columns={tblCols}
-              caption={`ρж = ${fmt(LIQUIDS[0].rho, 0)} кг/м³`}
-              minRows={5}
-            />
-          </div>
-          <div>
-            <h4>Таблица 2. Жидкость №2</h4>
-            <DataTable
-              rows={t2rows.map((rw, i) => ({ ...rw, i: i + 1 }))}
-              columns={tblCols}
-              caption={`ρж = ${fmt(LIQUIDS[1].rho, 0)} кг/м³`}
-              minRows={5}
-            />
-          </div>
+          <h4>Таблица 1. Время десяти колебаний</h4>
+          <DataTable
+            rows={periodRows.map((r, i) => ({ ...r, no: i + 1 }))}
+            columns={[
+              { key: 'no', label: 'Опыт' },
+              { key: 'A0', label: 'A₀', unit: 'град' },
+              { key: 't10', label: 't₁₀', unit: 'с', format: (v) => fmt(v, 2) },
+            ]}
+            minRows={3}
+          />
+          <h4 style={{ marginTop: 12 }}>Таблица 2. Амплитуды колебаний</h4>
+          <DataTable
+            rows={lastAmp ? [{ ...lastAmp.A }] : []}
+            columns={Array.from({ length: 10 }, (_, i) => ({
+              key: String(i),
+              label: `A${i}`,
+              unit: 'град',
+              format: (v) => fmt(v, 2),
+            }))}
+          />
         </div>
       </div>
 
       <div className="ctrl-col">
         <div className="ctrl-card">
-          <h5>Сосуд с жидкостью</h5>
+          <h5>Режим измерения</h5>
           <Radio
+            value={mode}
+            onChange={(v) => {
+              setMode(v)
+              setPhase('idle')
+              sim.current = { phase: 'idle', t: 0, total: 0, done: false, p: null }
+            }}
             options={[
-              { value: '1', label: 'Сосуд 1 (жидк. №1)' },
-              { value: '2', label: 'Сосуд 2 (жидк. №2)' },
+              { value: 'period', label: 'Период (10 колебаний)' },
+              { value: 'amp', label: 'Амплитуды A₀…A₉' },
             ]}
-            value={vessel}
-            onChange={setVessel}
           />
-          <div className="readouts" style={{ marginTop: 8 }}>
-            <Readout label="ρж" value={fmt(liq.rho, 0)} unit="кг/м³" />
-            <Readout label="Верхняя метка h" value={fmt(h, 2)} unit="м" />
-            <Readout label="Расстояние l" value={fmt(l, 2)} unit="м" hl />
-          </div>
-          <div className="small dim" style={{ marginTop: 6 }}>
-            В этом сосуде: {curRows.length} опытов, материалов шарика — {matsCount}. Требуется
-            минимум 2 материала по 3 опыта.
-          </div>
         </div>
         <div className="ctrl-card">
-          <h5>Шарик</h5>
-          <Select
-            label="Материал шарика"
-            value={mat}
-            onChange={setMat}
-            options={BALLS.map((b, i) => ({ value: String(i), label: `${b.name} (ρ = ${fmt(b.rho, 0)} кг/м³)` }))}
-          />
-          <Slider label="Радиус шарика r" value={r} onChange={setR} min={0.001} max={0.003} step={0.0005} unit="м" digits={3} />
-          <div className="readouts" style={{ marginTop: 8 }}>
-            <Readout label="ρш" value={fmt(bm.rho, 0)} unit="кг/м³" />
-            <Readout label={`«${curName}» в этом сосуде`} value={`${curCount} / 3`} unit="опыта" />
-          </div>
-          <div className="small dim" style={{ marginTop: 4 }}>
-            Размер шарика на схеме увеличен для наглядности.
-          </div>
-        </div>
-        <div className="ctrl-card">
-          <h5>Метки уровней</h5>
-          <Slider label="Верхняя метка, сосуд 1 (h₁)" value={h1} onChange={setH1} min={0.02} max={0.4} step={0.01} unit="м" digits={2} />
-          <Slider label="Верхняя метка, сосуд 2 (h₂)" value={h2} onChange={setH2} min={0.02} max={0.4} step={0.01} unit="м" digits={2} />
-          <div className="small dim" style={{ marginTop: 4 }}>
-            Нижняя метка общая: 0,45 м от поверхности.
+          <h5>Параметры маятника</h5>
+          <Slider label="Начальная амплитуда A₀" value={A0} onChange={setA0} min={3} max={10} step={0.5} unit="град" digits={1} />
+          <Slider label="Коэффициент затухания β" value={beta} onChange={setBeta} min={0.02} max={0.2} step={0.005} unit="с⁻¹" digits={3} />
+          <div className="readouts">
+            <Readout label="T (модель)" value={fmt(p.T, 3)} unit="с" hl />
+            <Readout label="ω" value={fmt(p.omega, 3)} unit="рад/с" />
+            <Readout label="τ = 1/β" value={fmt(1 / beta, 2)} unit="с" />
           </div>
         </div>
         <div className="ctrl-card">
           <h5>Управление</h5>
           <div className="btn-row">
-            <Btn onClick={drop} disabled={phase === 'fall'}>
-              Бросить шарик
+            <Btn onClick={prepare} disabled={phase === 'run'}>
+              Подготовить
             </Btn>
-            <Btn onClick={reset}>Сброс</Btn>
+            <Btn onClick={start} disabled={phase !== 'ready'}>
+              Старт
+            </Btn>
+            <Btn onClick={onClear}>Очистить</Btn>
           </div>
-          <Slider label="Скорость демонстрации" value={speed} onChange={setSpeed} min={1} max={20} step={1} unit="×" digits={0} />
-          {rows.length > 0 && (
-            <div className="btn-row">
-              <Btn variant="danger" onClick={onClear}>
-                Очистить таблицы
-              </Btn>
-            </div>
-          )}
+          <Slider label="Скорость анимации" value={speed} onChange={setSpeed} min={1} max={12} step={1} unit="×" digits={0} />
+          <div className="small dim" style={{ marginTop: 6 }}>
+            Скорость влияет только на анимацию; измеряемые время и амплитуды рассчитываются по модели установки.
+          </div>
         </div>
       </div>
     </div>
   )
-}
-
-function draw(ctx, s, ui) {
-  bg(ctx)
-  const vsl = ui.vessel
-
-  const x1 = 235
-  const x2 = 545
-  drawVessel(ctx, x1, LIQUIDS[0], vsl === '1', ui.h1)
-  drawVessel(ctx, x2, LIQUIDS[1], vsl === '2', ui.h2)
-
-  if (s.phase === 'fall' || s.phase === 'done') {
-    const bx = s.vsl === 1 ? x1 : x2
-    const bm = BALLS[+ui.mat]
-    const yy = SURF_Y + s.y * PX
-    ball(ctx, bx, yy, 4 + ui.r * 1500, { light: bm.color, dark: '#565f70' })
-  }
-
-  label(ctx, `ρж1 = ${fmt(LIQUIDS[0].rho, 0)} кг/м³ (η ≈ ${fmt(LIQUIDS[0].eta, 2)} Па·с)`, x1 - 58, 76, 12.5, '#44506b')
-  label(ctx, `ρж2 = ${fmt(LIQUIDS[1].rho, 0)} кг/м³ (η ≈ ${fmt(LIQUIDS[1].eta, 2)} Па·с)`, x2 - 58, 76, 12.5, '#44506b')
-}
-
-function drawVessel(ctx, x, liq, active, h) {
-  const halfW = 64
-  ctx.fillStyle = liq.eta > 0.5 ? 'rgba(217,192,138,0.75)' : 'rgba(169,203,217,0.75)'
-  ctx.fillRect(x - halfW, SURF_Y, halfW * 2, BOT_Y - SURF_Y)
-  line(ctx, x - halfW, SURF_Y, x + halfW, SURF_Y, '#ffffff', 2)
-
-  ctx.strokeStyle = active ? '#db2777' : '#7d8aa5'
-  ctx.lineWidth = active ? 4 : 3
-  ctx.beginPath()
-  ctx.moveTo(x - halfW, SURF_Y - 10)
-  ctx.lineTo(x - halfW, BOT_Y + 12)
-  ctx.lineTo(x + halfW, BOT_Y + 12)
-  ctx.lineTo(x + halfW, SURF_Y - 10)
-  ctx.stroke()
-
-  const yTop = SURF_Y + h * PX
-  ctx.setLineDash([7, 4])
-  line(ctx, x - halfW, yTop, x + halfW, yTop, '#c0344f', 2)
-  label(ctx, `h = ${h.toFixed(2).replace('.', ',')} м`, x + halfW + 8, yTop + 4, 11.5, '#c0344f')
-  const yBot = SURF_Y + H_BOTTOM * PX
-  line(ctx, x - halfW, yBot, x + halfW, yBot, '#16803c', 2)
-  label(ctx, '0,45 м', x + halfW + 8, yBot + 4, 11.5, '#16803c')
-  ctx.setLineDash([])
-
-  const midY = (yTop + yBot) / 2
-  ctx.strokeStyle = '#8b96ac'
-  ctx.lineWidth = 1.5
-  ctx.beginPath()
-  ctx.moveTo(x - halfW - 26, yTop)
-  ctx.lineTo(x - halfW - 26, yBot)
-  ctx.moveTo(x - halfW - 26, midY)
-  ctx.lineTo(x - halfW - 18, midY)
-  ctx.stroke()
-  label(ctx, 'l', x - halfW - 30, midY + 4, 13, '#44506b', 'right')
 }

@@ -1,326 +1,133 @@
 import { Eq, Tex } from '../../components/Tex.jsx'
 import DataTable from '../../components/DataTable.jsx'
 import Subst from '../../components/Subst.jsx'
-import { G, fmt, mean } from '../../utils/stats.js'
-import { L } from './content.jsx'
+import { G, fmt, mean, meanAbsDev } from '../../utils/stats.js'
 
-const K = 2 * Math.sqrt(G * L)
-const sin2 = (degAngle) => Math.sin((degAngle * Math.PI) / 180 / 2)
-
-export function computeStats(rows, version = 'web') {
-  const isPrint = version === 'print'
-  const calc = rows.map((r) => {
-    if (isPrint) {
-      if (r.mode === 'elastic') {
-        const pb = r.m1 * r.a1
-        const pa = r.m1 * r.a1p + r.m2 * r.a2p
-        const Eb = r.m1 * r.a1 * r.a1
-        const Ea = r.m1 * r.a1p * r.a1p + r.m2 * r.a2p * r.a2p
-        return {
-          ...r,
-          pb,
-          pa,
-          Eb,
-          Ea,
-          dp: Math.abs(pa - pb) / pb * 100,
-          dE: Math.abs(Ea - Eb) / Eb * 100,
-        }
-      }
-      const pb = r.m1 * r.a1
-      const pa = (r.m1 + r.m2) * r.ap
-      const Eb = r.m1 * r.a1 * r.a1
-      const Ea = (r.m1 + r.m2) * r.ap * r.ap
-      return {
-        ...r,
-        pb,
-        pa,
-        Eb,
-        Ea,
-        dp: Math.abs(pa - pb) / pb * 100,
-        dE: Math.abs(Ea - Eb) / Eb * 100,
-      }
-    }
-    const v1 = K * sin2(r.a1)
-    if (r.mode === 'elastic') {
-      const u1 = Math.sign(r.a1p || 1) * K * sin2(Math.abs(r.a1p))
-      const u2 = K * sin2(r.a2p)
-      const pb = r.m1 * v1
-      const pa = r.m1 * u1 + r.m2 * u2
-      return { ...r, v1, u1, u2, pb, pa, dp: Math.abs(pa - pb) / pb * 100 }
-    }
-    const u = K * sin2(r.ap)
-    const pb = r.m1 * v1
-    const pa = (r.m1 + r.m2) * u
-    return { ...r, v1, u, pb, pa, dp: Math.abs(pa - pb) / pb * 100 }
-  })
-  const elast = calc.filter((c) => c.mode === 'elastic')
-  const inel = calc.filter((c) => c.mode === 'inelastic')
-  return {
-    calc,
-    version,
-    elast: { n: elast.length, davg: mean(elast.map((e) => e.dp)), eavg: mean(elast.map((e) => e.dE)) },
-    inel: { n: inel.length, davg: mean(inel.map((e) => e.dp)), eavg: mean(inel.map((e) => e.dE)) },
+export function Jof(r, version) {
+  if (version === 'print') {
+    return r.m * r.r ** 2 * ((G * r.t ** 2 * r.h1) / (r.h * (r.h + r.h1)) - 1)
   }
+  return (r.m * r.r ** 2 * r.n2 * (G * r.t ** 2 - 2 * r.h)) / (2 * r.h * (r.n1 + r.n2))
 }
 
-export default function Lab2Calc({ rows, version = 'web' }) {
+export function computeStats(rows, version) {
+  const Js = rows.map((r) => Jof(r, version))
+  const Jm = mean(Js)
+  const dJ = meanAbsDev(Js)
+  return { Jm, dJ, rel: Number.isFinite(Jm) && Jm !== 0 ? (dJ / Jm) * 100 : NaN }
+}
+
+export default function Lab1Calc({ version, rows }) {
   const isPrint = version === 'print'
+  const calc = rows.map((r, idx) => ({ ...r, i: idx + 1, J: Jof(r, version) }))
   const st = computeStats(rows, version)
-  const elast = st.calc.filter((c) => c.mode === 'elastic')
-  const inel = st.calc.filter((c) => c.mode === 'inelastic')
+  const has = rows.length > 0
 
-  const substWeb = (r) => {
-    const v1 = String.raw`v_{1} &= 2\sqrt{gl}\,\sin\frac{\alpha_1}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.a1, 1)}^\circ}{2} = ${fmt(r.v1, 2)}\ \text{м/с}`
-    const pd = String.raw`p_{\text{до}} &= m_1 v_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.v1, 2)} = ${fmt(r.pb, 3)}\ \text{кг·м/с}`
-    if (r.mode === 'elastic') {
-      return String.raw`\begin{aligned}
-${v1}\\
-u_{1} &= 2\sqrt{gl}\,\sin\frac{|\alpha_1'|}{2} = ${fmt(K, 2)}\sin\frac{${fmt(Math.abs(r.a1p), 1)}^\circ}{2} = ${fmt(r.u1, 2)}\ \text{м/с}\\
-u_{2} &= 2\sqrt{gl}\,\sin\frac{\alpha_2'}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.a2p, 1)}^\circ}{2} = ${fmt(r.u2, 2)}\ \text{м/с}\\
-${pd}\\
-p_{\text{после}} &= m_1 u_1 + m_2 u_2 = ${fmt(r.m1, 2)}\cdot ${fmt(r.u1, 2)} + ${fmt(r.m2, 2)}\cdot ${fmt(r.u2, 2)} = ${fmt(r.pa, 3)}\ \text{кг·м/с}\\
-\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%
-\end{aligned}`
-    }
-    return String.raw`\begin{aligned}
-${v1}\\
-u &= 2\sqrt{gl}\,\sin\frac{\alpha'}{2} = ${fmt(K, 2)}\sin\frac{${fmt(r.ap, 1)}^\circ}{2} = ${fmt(r.u, 2)}\ \text{м/с}\\
-${pd}\\
-p_{\text{после}} &= (m_1+m_2)u = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot ${fmt(r.u, 2)} = ${fmt(r.pa, 3)}\ \text{кг·м/с}\\
-\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%
-\end{aligned}`
-  }
-
-  const substPrint = (r) => {
-    if (r.mode === 'elastic') {
-      return String.raw`\begin{aligned}
-p_{\text{до}} &= m_1\alpha_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)} = ${fmt(r.pb, 2)}\\
-p_{\text{после}} &= m_1\alpha_1' + m_2\alpha_2' = ${fmt(r.m1, 2)}\cdot(${fmt(r.a1p, 1)}) + ${fmt(r.m2, 2)}\cdot ${fmt(r.a2p, 1)} = ${fmt(r.pa, 2)}\\
-\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%\\
-E_{\text{до}} &= m_1\alpha_1^2 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)}^2 = ${fmt(r.Eb, 1)}\\
-E_{\text{после}} &= m_1\alpha_1'^2 + m_2\alpha_2'^2 = ${fmt(r.m1, 2)}\cdot(${fmt(r.a1p, 1)})^2 + ${fmt(r.m2, 2)}\cdot ${fmt(r.a2p, 1)}^2 = ${fmt(r.Ea, 1)}\\
-\Delta E &= \frac{|E_{\text{после}} - E_{\text{до}}|}{E_{\text{до}}}\cdot 100\% = ${fmt(r.dE, 1)}\%
-\end{aligned}`
-    }
-    return String.raw`\begin{aligned}
-p_{\text{до}} &= m_1\alpha_1 = ${fmt(r.m1, 2)}\cdot ${fmt(r.a1, 1)} = ${fmt(r.pb, 2)}\\
-p_{\text{после}} &= (m_1+m_2)\alpha' = (${fmt(r.m1, 2)} + ${fmt(r.m2, 2)})\cdot ${fmt(r.ap, 1)} = ${fmt(r.pa, 2)}\\
-\Delta p &= \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\% = ${fmt(r.dp, 1)}\%\\
-E_{\text{до}} &= m_1\alpha_1^2 = ${fmt(r.Eb, 1)},\qquad E_{\text{после}} = (m_1+m_2)\alpha'^2 = ${fmt(r.Ea, 1)}\\
-\Delta E &= \frac{E_{\text{до}} - E_{\text{после}}}{E_{\text{до}}}\cdot 100\% = ${fmt(r.dE, 1)}\ \text{(потеря энергии)}
-\end{aligned}`
-  }
-
-  const substTex = isPrint ? substPrint : substWeb
+  const columns = isPrint
+    ? [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 'h1', label: 'h₁', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+        { key: 'J', label: 'J', unit: 'кг·м²', format: (v) => fmt(v, 4) },
+      ]
+    : [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+        { key: 'n1', label: 'n₁', unit: 'об' },
+        { key: 'n2', label: 'n₂', unit: 'об' },
+        { key: 'J', label: 'J', unit: 'кг·м²', format: (v) => fmt(v, 4) },
+      ]
 
   return (
     <>
-      <h3>Проверка закона сохранения импульса{isPrint ? ' и энергии' : ''}</h3>
-
+      <h3>Расчёт момента инерции маховика</h3>
       {isPrint ? (
         <>
           <p>
-            Начальный угол отклонения мал (<Tex>{String.raw`\alpha_1 = 10^\circ`}</Tex>), поэтому
-            справедливо приближение малых углов:{' '}
-            <Tex>{String.raw`\sin\frac{\alpha}{2} \approx \frac{\alpha}{2}`}</Tex>, то есть скорости
-            шаров пропорциональны углам отклонения. Проверка закона сохранения импульса ведётся
-            непосредственно по углам (в градусах):
+            По данным каждого опыта вычисляется момент инерции маховика по рабочей формуле (12),
+            полученной из закона сохранения энергии (см. вкладку «Теория»):
           </p>
-          <Eq n={16}>{String.raw`m_1\alpha_1 = m_1\alpha_1' + m_2\alpha_2'`}</Eq>
-          <p>а при абсолютно упругом ударе дополнительно проверяется закон сохранения энергии:</p>
-          <Eq n={17}>{String.raw`m_1\alpha_1^2 = m_1\alpha_1'^2 + m_2\alpha_2'^2`}</Eq>
-          <p>При абсолютно неупругом ударе сохраняется только импульс:</p>
-          <Eq n={18}>{String.raw`m_1\alpha_1 = (m_1+m_2)\alpha'`}</Eq>
-          <p>Относительные отклонения импульса и энергии в каждом опыте:</p>
-          <Eq>{String.raw`\Delta p = \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\%,\qquad \Delta E = \frac{|E_{\text{после}} - E_{\text{до}}|}{E_{\text{до}}}\cdot 100\%`}</Eq>
+          <Eq n={12}>{String.raw`J_i = m_i r^2\left(\frac{g\,t_i^2\,h_{1i}}{h\,(h + h_{1i})} - 1\right)`}</Eq>
+          <p>
+            где <Tex>{String.raw`g = 9{,}81`}</Tex> м/с² — ускорение свободного падения;{' '}
+            <Tex>{String.raw`m_i`}</Tex> — масса груза; <Tex>{String.raw`r`}</Tex> — радиус шкива;{' '}
+            <Tex>{String.raw`h`}</Tex> — высота падения груза; <Tex>{String.raw`t_i`}</Tex> — время
+            падения; <Tex>{String.raw`h_{1i}`}</Tex> — высота подъёма груза после падения.
+          </p>
         </>
       ) : (
         <>
           <p>
-            Скорости шаров до и после удара определяются по углам отклонения из формулы (13). При{' '}
-            <Tex>{String.raw`l = ${fmt(L, 2)}`}</Tex> м множитель{' '}
-            <Tex>{String.raw`2\sqrt{gl} = ${fmt(K, 2)}`}</Tex> м/с, поэтому:
+            По данным каждого опыта вычисляется момент инерции маховика по рабочей формуле (13),
+            полученной из закона сохранения энергии (см. вкладку «Теория»):
           </p>
-          <Eq>{String.raw`v_1 = 2\sqrt{gl}\,\sin\frac{\alpha_1}{2},\qquad u_1 = \pm 2\sqrt{gl}\,\sin\frac{|\alpha_1'|}{2},\qquad u_2 = 2\sqrt{gl}\,\sin\frac{\alpha_2'}{2}`}</Eq>
+          <Eq n={13}>{String.raw`J_i = \frac{m_i r^2 n_{2i}\,(g t_i^2 - 2h)}{2h\,(n_{1i}+n_{2i})}`}</Eq>
           <p>
-            Знак <Tex>{String.raw`u_1`}</Tex> определяется направлением движения первого шара после
-            удара (если <Tex>{String.raw`m_1 < m_2`}</Tex>, шар отскакивает назад — угол{' '}
-            <Tex>{String.raw`\alpha_1' < 0`}</Tex>). Импульс системы до удара и после удара:
+            где <Tex>{String.raw`g = 9{,}81`}</Tex> м/с² — ускорение свободного падения;{' '}
+            <Tex>{String.raw`m_i`}</Tex> — масса груза; <Tex>{String.raw`r`}</Tex> — радиус шкива;{' '}
+            <Tex>{String.raw`h`}</Tex> — высота падения груза; <Tex>{String.raw`t_i`}</Tex> — время
+            падения; <Tex>{String.raw`n_{1i},\ n_{2i}`}</Tex> — числа оборотов маховика при падении
+            груза и до полной остановки.
           </p>
-          <Eq>{String.raw`p_{\text{до}} = m_1 v_1, \qquad p_{\text{после}} = m_1 u_1 + m_2 u_2 \ \ \text{(упругий)}, \qquad p_{\text{после}} = (m_1+m_2)u\ \ \text{(неупругий)}`}</Eq>
-          <p>Относительное отклонение импульса в каждом опыте:</p>
-          <Eq>{String.raw`\Delta p = \frac{|p_{\text{после}} - p_{\text{до}}|}{p_{\text{до}}}\cdot 100\%`}</Eq>
         </>
       )}
 
-      {elast.length > 0 && (
+      {has && (
         <>
-          <h4>{isPrint ? 'Таблица 3. Упругий удар — импульс и энергия' : 'Таблица 3. Абсолютно упругий удар'}</h4>
+          <h4>Таблица 2. Вычисление момента инерции</h4>
           <DataTable
-            rows={elast.map((r, i) => ({ ...r, i: i + 1 }))}
-            columns={
-              isPrint
-                ? [
-                    { key: 'i', label: '№' },
-                    { key: 'a1', label: 'α₁', unit: '°' },
-                    { key: 'a1p', label: "α₁'", unit: '°' },
-                    { key: 'a2p', label: "α₂'", unit: '°' },
-                    { key: 'm1', label: 'm₁', unit: 'кг' },
-                    { key: 'm2', label: 'm₂', unit: 'кг' },
-                    { key: 'pb', label: 'p до', format: (v) => fmt(v, 2) },
-                    { key: 'pa', label: 'p после', format: (v) => fmt(v, 2) },
-                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-                    { key: 'Eb', label: 'E до', format: (v) => fmt(v, 1) },
-                    { key: 'Ea', label: 'E после', format: (v) => fmt(v, 1) },
-                    { key: 'dE', label: 'ΔE', unit: '%', format: (v) => fmt(v, 1) },
-                  ]
-                : [
-                    { key: 'i', label: '№' },
-                    { key: 'a1', label: 'α₁', unit: '°' },
-                    { key: 'a1p', label: "α₁'", unit: '°' },
-                    { key: 'a2p', label: "α₂'", unit: '°' },
-                    { key: 'm1', label: 'm₁', unit: 'кг' },
-                    { key: 'm2', label: 'm₂', unit: 'кг' },
-                    { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-                    { key: 'u1', label: 'u₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-                    { key: 'u2', label: 'u₂', unit: 'м/с', format: (v) => fmt(v, 2) },
-                    { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-                    { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-                  ]
-            }
+            rows={calc}
+            columns={columns}
+            caption="Радиус шкива r и высота падения h берутся для каждого опыта (могут отличаться)"
           />
-          <p>Средние отклонения по опытам:</p>
-          <Eq>{String.raw`\overline{\Delta p} = \frac{${elast.map((r) => fmt(r.dp, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.davg, 1)}\%${isPrint ? String.raw`,\qquad \overline{\Delta E} = \frac{${elast.map((r) => fmt(r.dE, 1)).join(' + ')}}{${elast.length}} = ${fmt(st.elast.eavg, 1)}\%` : ''}`}</Eq>
-        </>
-      )}
 
-      {inel.length > 0 && (
-        <>
-          <h4>{isPrint ? 'Таблица 4. Неупругий удар — импульс и энергия' : 'Таблица 4. Абсолютно неупругий удар'}</h4>
-          <DataTable
-            rows={inel.map((r, i) => ({ ...r, i: i + 1 }))}
-            columns={
-              isPrint
-                ? [
-                    { key: 'i', label: '№' },
-                    { key: 'a1', label: 'α₁', unit: '°' },
-                    { key: 'ap', label: "α'", unit: '°' },
-                    { key: 'm1', label: 'm₁', unit: 'кг' },
-                    { key: 'm2', label: 'm₂', unit: 'кг' },
-                    { key: 'pb', label: 'p до', format: (v) => fmt(v, 2) },
-                    { key: 'pa', label: 'p после', format: (v) => fmt(v, 2) },
-                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-                    { key: 'Eb', label: 'E до', format: (v) => fmt(v, 1) },
-                    { key: 'Ea', label: 'E после', format: (v) => fmt(v, 1) },
-                    { key: 'dE', label: 'ΔE', unit: '%', format: (v) => fmt(v, 1) },
-                  ]
-                : [
-                    { key: 'i', label: '№' },
-                    { key: 'a1', label: 'α₁', unit: '°' },
-                    { key: 'ap', label: "α'", unit: '°' },
-                    { key: 'm1', label: 'm₁', unit: 'кг' },
-                    { key: 'm2', label: 'm₂', unit: 'кг' },
-                    { key: 'v1', label: 'v₁', unit: 'м/с', format: (v) => fmt(v, 2) },
-                    { key: 'u', label: 'u', unit: 'м/с', format: (v) => fmt(v, 2) },
-                    { key: 'pb', label: 'p до', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-                    { key: 'pa', label: 'p после', unit: 'кг·м/с', format: (v) => fmt(v, 3) },
-                    { key: 'dp', label: 'Δp', unit: '%', format: (v) => fmt(v, 1) },
-                  ]
-            }
-          />
-          <p>Средние отклонения по опытам:</p>
-          <Eq>{String.raw`\overline{\Delta p} = \frac{${inel.map((r) => fmt(r.dp, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.davg, 1)}\%${isPrint ? String.raw`,\qquad \overline{\Delta E} = \frac{${inel.map((r) => fmt(r.dE, 1)).join(' + ')}}{${inel.length}} = ${fmt(st.inel.eavg, 1)}\%` : ''}`}</Eq>
-        </>
-      )}
-
-      {st.calc.length > 0 && (
-        <>
           <h4>Подстановка значений по опытам</h4>
           <p>
-            {isPrint
-              ? 'Для каждого опыта импульс и (при упругом ударе) энергия вычисляются по углам отклонения:'
-              : 'Для каждого опыта вычисляются скорости шаров, импульс до и после удара и относительное отклонение импульса:'}
+            Вычисление момента инерции для каждого опыта по формуле ({isPrint ? '12' : '13'}):
           </p>
-          <Subst items={st.calc.map((r) => substTex(r))} />
-        </>
-      )}
-
-      {(elast.length > 0 || inel.length > 0) && (
-        <>
-          <h4>Сравнение с теорией</h4>
-          <p>
-            {isPrint ? (
-              <>
-                По формулам (9) и (5) в приближении малых углов вычисляются теоретические углы
-                отклонения после удара и сравниваются с измеренными:
-              </>
-            ) : (
-              <>
-                По формулам (10) и (5) вычисляются теоретические углы отклонения после удара и
-                сравниваются с измеренными:
-              </>
+          <Subst
+            items={calc.map((r, i) =>
+              isPrint
+                ? String.raw`J_{${i + 1}} = ${fmt(r.m, 2)}\cdot ${fmt(r.r, 2)}^2\left(\frac{9{,}81\cdot ${fmt(r.t, 2)}^2\cdot ${fmt(r.h1, 3)}}{${fmt(r.h, 2)}\cdot\left(${fmt(r.h, 2)}+${fmt(r.h1, 3)}\right)} - 1\right) = ${fmt(r.J, 4)}\ \text{кг·м}^2`
+                : String.raw`J_{${i + 1}} = \frac{${fmt(r.m, 2)}\cdot ${fmt(r.r, 2)}^2\cdot ${r.n2}\cdot\left(9{,}81\cdot ${fmt(r.t, 2)}^2 - 2\cdot ${fmt(r.h, 2)}\right)}{2\cdot ${fmt(r.h, 2)}\cdot\left(${r.n1}+${r.n2}\right)} = ${fmt(r.J, 4)}\ \text{кг·м}^2`
             )}
-          </p>
-          <Eq>{isPrint
-            ? String.raw`\alpha_{1,\text{теор}}' = \frac{m_1-m_2}{m_1+m_2}\,\alpha_1,\qquad \alpha_{2,\text{теор}}' = \frac{2m_1}{m_1+m_2}\,\alpha_1,\qquad \alpha_{\text{теор}}' = \frac{m_1}{m_1+m_2}\,\alpha_1`
-            : String.raw`\sin\frac{\alpha_{1,\text{теор}}}{2} = \frac{m_1-m_2}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{2,\text{теор}}}{2} = \frac{2m_1}{m_1+m_2}\sin\frac{\alpha_1}{2},\qquad \sin\frac{\alpha_{\text{теор}}}{2} = \frac{m_1}{m_1+m_2}\sin\frac{\alpha_1}{2}`}</Eq>
-          <DataTable
-            rows={st.calc.map((r, i) => {
-              if (isPrint) {
-                const at1 = r.mode === 'elastic' ? ((r.m1 - r.m2) / (r.m1 + r.m2)) * r.a1 : null
-                const at2 = r.mode === 'elastic' ? (2 * r.m1 / (r.m1 + r.m2)) * r.a1 : null
-                const at = r.mode === 'inelastic' ? (r.m1 / (r.m1 + r.m2)) * r.a1 : null
-                return {
-                  i: i + 1,
-                  mode: r.mode === 'elastic' ? 'упругий' : 'неупругий',
-                  meas: r.mode === 'elastic' ? `${fmt(r.a1p, 1)} / ${fmt(r.a2p, 1)}` : fmt(r.ap, 1),
-                  theor: r.mode === 'elastic' ? `${fmt(at1, 1)} / ${fmt(at2, 1)}` : fmt(at, 1),
-                }
-              }
-              const s1 = sin2(r.a1)
-              const at1 = r.mode === 'elastic' ? 2 * Math.asin(((r.m1 - r.m2) / (r.m1 + r.m2)) * s1) * 180 / Math.PI : null
-              const at2 = r.mode === 'elastic' ? 2 * Math.asin((2 * r.m1 / (r.m1 + r.m2)) * s1) * 180 / Math.PI : null
-              const at = r.mode === 'inelastic' ? 2 * Math.asin((r.m1 / (r.m1 + r.m2)) * s1) * 180 / Math.PI : null
-              return {
-                i: i + 1,
-                mode: r.mode === 'elastic' ? 'упругий' : 'неупругий',
-                meas: r.mode === 'elastic' ? `${fmt(r.a1p, 1)} / ${fmt(r.a2p, 1)}` : fmt(r.ap, 1),
-                theor: r.mode === 'elastic' ? `${fmt(at1, 1)} / ${fmt(at2, 1)}` : fmt(at, 1),
-              }
-            })}
-            columns={[
-              { key: 'i', label: '№' },
-              { key: 'mode', label: 'Вид удара', txt: true },
-              { key: 'meas', label: "α' измеренные", unit: '°' },
-              { key: 'theor', label: "α' теоретические", unit: '°' },
-            ]}
-            caption="Измеренные углы (α₁' / α₂' или α') против теоретических"
           />
+
+          <h3>Расчёт погрешностей</h3>
+          <p>Среднее значение момента инерции:</p>
+          <Eq>{String.raw`J_{\text{ср}} = \frac{1}{N}\sum_{i=1}^{N} J_i = \frac{${calc.map((r) => fmt(r.J, 4)).join(' + ')}}{${calc.length}} = ${fmt(st.Jm, 4)}\ \text{кг·м}^2`}</Eq>
+          <p>Отклонения результатов отдельных опытов от среднего:</p>
+          <Subst
+            items={calc.map((r, i) =>
+              String.raw`\left|J_{${i + 1}} - J_{\text{ср}}\right| = \left|${fmt(r.J, 4)} - ${fmt(st.Jm, 4)}\right| = ${fmt(Math.abs(r.J - st.Jm), 4)}\ \text{кг·м}^2`
+            )}
+          />
+          <p>Абсолютная погрешность — средняя абсолютная ошибка измерений:</p>
+          <Eq>{String.raw`\Delta J = \frac{1}{N}\sum_{i=1}^{N}\left|J_i - J_{\text{ср}}\right| = \frac{${calc.map((r) => fmt(Math.abs(r.J - st.Jm), 4)).join(' + ')}}{${calc.length}} = ${fmt(st.dJ, 4)}\ \text{кг·м}^2`}</Eq>
+          <p>Относительная погрешность:</p>
+          <Eq>{String.raw`\delta_J = \frac{\Delta J}{J_{\text{ср}}}\cdot 100\% = ${fmt(st.rel, 1)}\%`}</Eq>
+
+          <div className="result-box">
+            <div className="rb-main">
+              Результат: <Tex>{String.raw`J = \left(${fmt(st.Jm, 4)} \pm ${fmt(st.dJ, 4)}\right)\ \text{кг·м}^2`}</Tex>
+            </div>
+            <div className="rb-sub">
+              Относительная погрешность измерений: <b>δ = {fmt(st.rel, 1)} %</b>. Истинное значение
+              лежит в интервале <Tex>{String.raw`J_{\text{ср}} - \Delta J \le J \le J_{\text{ср}} + \Delta J`}</Tex> с
+              вероятностью, близкой к единице.
+            </div>
+          </div>
         </>
       )}
-
-      {rows.length === 0 && (
-        <div className="tbl-empty">Нет данных для расчёта. Выполните измерения на вкладке «Эксперимент».</div>
-      )}
-
-      {rows.length > 0 && (
-        <div className="result-box">
-          <div className="rb-main">
-            {isPrint ? 'Импульс (и энергия при упругом ударе) сохраняются' : 'Закон сохранения импульса выполняется'}
-          </div>
-          <div className="rb-sub">
-            {st.elast.n > 0 && (
-              <>
-                Упругий удар: Δp = {fmt(st.elast.davg, 1)} %{isPrint ? `, ΔE = ${fmt(st.elast.eavg, 1)} %` : ''} ({st.elast.n} опытов).{' '}
-              </>
-            )}
-            {st.inel.n > 0 && (
-              <>
-                Неупругий удар: Δp = {fmt(st.inel.davg, 1)} %{isPrint ? `, потеря энергии ΔE = ${fmt(st.inel.eavg, 1)} %` : ''} ({st.inel.n} опытов).
-              </>
-            )}
-          </div>
+      {!has && (
+        <div className="tbl-empty">
+          Нет данных для расчёта. Выполните измерения на вкладке «Эксперимент».
         </div>
       )}
     </>

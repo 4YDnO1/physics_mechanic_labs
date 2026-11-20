@@ -1,170 +1,122 @@
 import { useRef, useState } from 'react'
-import { Canvas, useSimLoop, bg, line, label, ball } from '../../utils/canvas.jsx'
-import { Btn, Readout, Slider, Radio, Select } from '../../components/controls.jsx'
+import { Canvas, useSimLoop, bg, line, label } from '../../utils/canvas.jsx'
+import { Btn, Readout, Select, Slider } from '../../components/controls.jsx'
 import DataTable from '../../components/DataTable.jsx'
-import { G, fmt, rnd } from '../../utils/stats.js'
+import { G, noisePct, fmt } from '../../utils/stats.js'
 
-const L = 0.5
-const Lpx = 295
-const PIVY = 46
-const CX = 390
+const J_TRUE = 0.02
+const MF = 0.015
 
-const MASS_OPTS = [
-  { value: '0.04', label: '40 г' },
-  { value: '0.112', label: '112 г' },
+const R_OPTS = [
+  { value: 0.04, label: '0,04 м' },
+  { value: 0.05, label: '0,05 м' },
+  { value: 0.06, label: '0,06 м' },
 ]
 
-const rad = (d) => (d * Math.PI) / 180
-const deg = (r) => (r * 180) / Math.PI
-const ballR = (m) => 12 + 13 * Math.cbrt(m / 0.5)
-
-const resolveBalls = (s) => {
-  const R1 = ballR(s.p.m1)
-  const R2 = ballR(s.p.m2)
-  const q1x = CX - (R1 + R2) / 2 - 1
-  const q2x = CX + (R1 + R2) / 2 + 1
-  const x1 = q1x + Lpx * Math.sin(s.th1)
-  const x2 = q2x + Lpx * Math.sin(s.th2)
-  if (x2 - x1 < R1 + R2) {
-    const avg = (s.th1 + s.th2) / 2
-    const half = 1 / Lpx
-    s.th1 = avg + half
-    s.th2 = avg - half
-    const v1 = Lpx * s.w1
-    const v2 = Lpx * s.w2
-    if (v1 - v2 > 0) {
-      const { m1, m2 } = s.p
-      s.w1 = (((m1 - m2) * v1 + 2 * m2 * v2) / (m1 + m2)) / Lpx
-      s.w2 = (((m2 - m1) * v2 + 2 * m1 * v1) / (m1 + m2)) / Lpx
-    }
-  }
+function kin(r, h, m) {
+  const a1 = (r * (m * G * r - MF)) / (J_TRUE + m * r * r)
+  const tFall = Math.sqrt((2 * h) / a1)
+  const wEnd = (a1 * tFall) / r
+  const eps2 = MF / J_TRUE
+  const tStop = wEnd / eps2
+  const a2 = (r * (m * G * r + MF)) / (J_TRUE + m * r * r)
+  const h1 = h * (a1 / a2)
+  return { a1, tFall, wEnd, eps2, tStop, a2, h1 }
 }
 
-export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
+export default function Lab1Sim({ version, rows, onResult, onClear }) {
   const isPrint = version === 'print'
-  const [mode, setMode] = useState('elastic')
-  const [a1, setA1] = useState(isPrint ? 10 : 45)
-  const [m1, setM1] = useState(isPrint ? 0.112 : 0.2)
-  const [m2, setM2] = useState(isPrint ? 0.04 : 0.1)
+  const [r, setR] = useState(0.05)
+  const [h, setH] = useState(1.5)
+  const [m, setM] = useState(0.2)
+  const [speed, setSpeed] = useState(3)
   const [phase, setPhase] = useState('idle')
-  const [live, setLive] = useState({ th1: 0, th2: 0 })
+  const [live, setLive] = useState({ t: 0, x: 0, w: 0 })
   const sim = useRef({ phase: 'idle' })
   const cnv = useRef(null)
   const acc = useRef(0)
 
   const prepare = () => {
-    const a = rad(a1)
     sim.current = {
       phase: 'ready',
-      p: { mode, a1, m1, m2 },
-      th1: -a,
-      w1: 0,
-      th2: 0,
-      w2: 0,
-      rec1: null,
-      rec2: null,
-      post: false,
-      settled: false,
+      t: 0,
+      theta: 0,
+      omega: 0,
+      x: 0,
+      tau: 0,
+      k: kin(r, h, m),
+      p: { r, h, m },
+      rec: null,
     }
     setPhase('ready')
-    setLive({ th1: -a, th2: 0 })
+    setLive({ t: 0, x: 0, w: 0 })
   }
 
   const start = () => {
     if (sim.current.phase !== 'ready') return
-    sim.current.phase = 'fly'
-    setPhase('fly')
-  }
-
-  const step = (s, dt) => {
-    const sub = 8
-    const h = dt / sub
-    for (let i = 0; i < sub; i++) {
-      if (s.phase === 'fly') {
-        s.w1 += -(G / L) * Math.sin(s.th1) * h
-        s.th1 += s.w1 * h
-        if (s.th1 >= 0) {
-          s.th1 = 0
-          const v1 = 2 * Math.sqrt(G * L) * Math.sin(rad(s.p.a1) / 2)
-          if (s.p.mode === 'elastic') {
-            const u1 = ((s.p.m1 - s.p.m2) / (s.p.m1 + s.p.m2)) * v1
-            const u2 = ((2 * s.p.m1) / (s.p.m1 + s.p.m2)) * v1
-            s.w1 = u1 / L
-            s.w2 = u2 / L
-          } else {
-            const u = (s.p.m1 / (s.p.m1 + s.p.m2)) * v1
-            s.w1 = u / L
-            s.w2 = u / L
-          }
-          s.phase = 'post'
-          s.post = true
-          setPhase('post')
-        }
-      } else if (s.phase === 'post' || s.phase === 'done') {
-        const k = s.phase === 'done' ? Math.max(0, 1 - 1.2 * h) : 1
-        const pw1 = s.w1
-        const pw2 = s.w2
-        s.w1 += -(G / L) * Math.sin(s.th1) * h
-        s.w1 *= k
-        s.th1 += s.w1 * h
-        if (s.p.mode === 'elastic') {
-          s.w2 += -(G / L) * Math.sin(s.th2) * h
-          s.w2 *= k
-          s.th2 += s.w2 * h
-          if (s.phase === 'post') {
-            if (s.rec1 === null && (Math.abs(s.w1) < 1e-4 || s.w1 * pw1 < 0)) {
-              const mag = Math.abs(deg(s.th1))
-              const sgn = s.th1 >= 0 ? 1 : -1
-              s.rec1 = sgn * Math.max(0, mag + rnd(-0.5, 0.5))
-              if (mag < 0.05) s.rec1 = rnd(-0.4, 0.4)
-            }
-            if (s.rec2 === null && (Math.abs(s.w2) < 1e-4 || s.w2 * pw2 < 0)) {
-              s.rec2 = Math.max(0.2, Math.abs(deg(s.th2)) + rnd(-0.5, 0.5))
-            }
-            if (s.rec1 !== null && s.rec2 !== null) {
-              s.phase = 'done'
-              onResult({
-                mode: 'elastic',
-                a1: s.p.a1,
-                a1p: +s.rec1.toFixed(1),
-                a2p: +s.rec2.toFixed(1),
-                m1: s.p.m1,
-                m2: s.p.m2,
-              })
-              setPhase('done')
-            }
-          }
-        } else {
-          s.th2 = s.th1
-          s.w2 = s.w1
-          if (s.phase === 'post' && s.rec1 === null && (Math.abs(s.w1) < 1e-4 || s.w1 * pw1 < 0)) {
-            s.rec1 = Math.max(0.2, Math.abs(deg(s.th1)) + rnd(-0.5, 0.5))
-            s.phase = 'done'
-            onResult({
-              mode: 'inelastic',
-              a1: s.p.a1,
-              ap: +s.rec1.toFixed(1),
-              m1: s.p.m1,
-              m2: s.p.m2,
-            })
-            setPhase('done')
-          }
-        }
-        resolveBalls(s)
-      }
-    }
+    sim.current.phase = 'fall'
+    setPhase('fall')
   }
 
   useSimLoop(
     cnv,
     (dt, ctx) => {
       const s = sim.current
-      step(s, dt)
-      draw(ctx, s)
+      const spd = speed
+      if (s.phase === 'fall') {
+        s.t += dt * spd
+        s.x = 0.5 * s.k.a1 * s.t * s.t
+        s.theta = s.x / s.p.r
+        s.omega = (s.k.a1 * s.t) / s.p.r
+        if (s.x >= s.p.h) {
+          s.x = s.p.h
+          s.t = s.k.tFall
+          s.tFall = s.k.tFall
+          const tMeas = +(s.k.tFall + (Math.random() < 0.5 ? -0.01 : 0.01)).toFixed(2)
+          if (isPrint) {
+            s.rec = { t: tMeas }
+            s.phase = 'rebound'
+            s.tau = 0
+            s.omega = s.k.wEnd
+            setPhase('rebound')
+          } else {
+            const n1True = s.p.h / (2 * Math.PI * s.p.r)
+            s.rec = { t: tMeas, n1: +(n1True * noisePct(0.004)).toFixed(1) }
+            s.phase = 'spin'
+            s.omega = s.k.wEnd
+            setPhase('spin')
+          }
+        }
+      } else if (s.phase === 'rebound') {
+        s.tau += dt * spd
+        const rise = 0.5 * s.k.a2 * s.tau * s.tau
+        s.x = Math.max(s.p.h - rise, 0)
+        s.omega = Math.max(s.k.wEnd - (s.k.a2 / s.p.r) * s.tau, 0)
+        if (rise >= s.k.h1) {
+          s.x = s.p.h - s.k.h1
+          s.omega = 0
+          s.phase = 'done'
+          s.rec.h1 = +(s.k.h1 * noisePct(0.006)).toFixed(3)
+          onResult({ ...s.p, t: s.rec.t, h1: s.rec.h1 })
+          setPhase('done')
+        }
+      } else if (s.phase === 'spin') {
+        s.omega -= s.k.eps2 * dt * spd
+        s.theta += s.omega * dt * spd
+        if (s.omega <= 0) {
+          s.omega = 0
+          s.phase = 'done'
+          const n2True = (s.theta - s.p.h / s.p.r) / (2 * Math.PI)
+          s.rec.n2 = +(n2True * noisePct(0.004)).toFixed(1)
+          onResult({ ...s.p, t: s.rec.t, n1: s.rec.n1, n2: s.rec.n2 })
+          setPhase('done')
+        }
+      }
+      draw(ctx, s, version)
       acc.current += dt
-      if (acc.current > 0.08) {
+      if (acc.current > 0.1) {
         acc.current = 0
-        setLive({ th1: s.th1 || 0, th2: s.th2 || 0 })
+        setLive({ t: s.tFall ?? s.t, x: s.x || 0, w: s.omega })
       }
     },
     true
@@ -172,15 +124,33 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
 
   const statusText = {
     idle: 'Установка не подготовлена. Задайте параметры и нажмите «Подготовить».',
-    ready: 'Шар 1 удерживается электромагнитом. Нажмите «Пуск».',
-    fly: 'Шар 1 падает с электромагнита…',
-    post: 'Удар произошёл — регистрируются углы максимального отклонения…',
+    ready: 'Груз поднят на высоту h. Нажмите «Старт».',
+    fall: 'Падение груза — маховик раскручивается…',
+    spin: 'Свободный выбег маховика после касания грузом пола…',
+    rebound: 'Нить наматывается обратно — груз поднимается на высоту h₁…',
     done: 'Опыт завершён. Результаты занесены в таблицу.',
   }[phase]
 
-  const elastRows = rows.filter((r) => r.mode === 'elastic')
-  const inelRows = rows.filter((r) => r.mode === 'inelastic')
-  const shown = mode === 'elastic' ? elastRows : inelRows
+  const columns = isPrint
+    ? [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 'h1', label: 'h₁', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+      ]
+    : [
+        { key: 'i', label: '№' },
+        { key: 'm', label: 'm', unit: 'кг' },
+        { key: 'r', label: 'r', unit: 'м' },
+        { key: 'h', label: 'h', unit: 'м' },
+        { key: 't', label: 't', unit: 'с' },
+        { key: 'n1', label: 'n₁', unit: 'об' },
+        { key: 'n2', label: 'n₂', unit: 'об' },
+      ]
+
+  const last = rows[rows.length - 1]
 
   return (
     <div className="practice">
@@ -189,109 +159,73 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
           <Canvas canvasRef={cnv} />
           <div className="sim-status">
             <span className="readout">
-              θ₁<b>{fmt(deg(live.th1), 1)}°</b>
+              t<b>{fmt(live.t, 2)} с</b>
             </span>
+            {isPrint ? (
+              <span className="readout">
+                h<b>{fmt(live.x, 2)} м</b>
+              </span>
+            ) : (
+              <span className="readout">
+                n<b>{fmt(live.x / (2 * Math.PI * (sim.current.p?.r ?? r)), 1)} об</b>
+              </span>
+            )}
             <span className="readout">
-              θ₂<b>{fmt(deg(live.th2), 1)}°</b>
+              ω<b>{fmt(live.w, 1)} рад/с</b>
             </span>
             <span>{statusText}</span>
           </div>
         </div>
         <div style={{ marginTop: 14 }}>
-          <h4>Таблица результатов — {mode === 'elastic' ? 'абсолютно упругий удар' : 'абсолютно неупругий удар'}</h4>
-          {mode === 'elastic' ? (
-            <DataTable
-              rows={shown.map((r, i) => ({ ...r, i: i + 1 }))}
-              columns={[
-                { key: 'i', label: '№' },
-                { key: 'a1', label: 'α₁', unit: '°' },
-                { key: 'a1p', label: "α₁'", unit: '°' },
-                { key: 'a2p', label: "α₂'", unit: '°' },
-                { key: 'm1', label: 'm₁', unit: 'кг' },
-                { key: 'm2', label: 'm₂', unit: 'кг' },
-              ]}
-              caption="Таблица 1. Упругий удар: α₁ — начальный угол; α₁', α₂' — углы после удара"
-            />
-          ) : (
-            <DataTable
-              rows={shown.map((r, i) => ({ ...r, i: i + 1 }))}
-              columns={[
-                { key: 'i', label: '№' },
-                { key: 'a1', label: 'α₁', unit: '°' },
-                { key: 'ap', label: "α'", unit: '°' },
-                { key: 'm1', label: 'm₁', unit: 'кг' },
-                { key: 'm2', label: 'm₂', unit: 'кг' },
-              ]}
-              caption="Таблица 2. Неупругий удар: α₁ — начальный угол; α' — угол сцепившихся шаров"
-            />
-          )}
+          <h4>Таблица результатов</h4>
+          <DataTable
+            rows={rows}
+            columns={columns}
+            caption="Радиус шкива r, высота падения h и масса груза m задаются перед каждым опытом"
+          />
         </div>
       </div>
 
       <div className="ctrl-col">
         <div className="ctrl-card">
-          <h5>Вид удара</h5>
-          <Radio
-            value={mode}
-            onChange={(v) => setMode(v)}
-            options={[
-              { value: 'elastic', label: 'Абсолютно упругий' },
-              { value: 'inelastic', label: 'Абсолютно неупругий' },
-            ]}
-          />
-        </div>
-        <div className="ctrl-card">
-          <h5>Характеристики шаров</h5>
-          {isPrint ? (
-            <>
-              <Select label="Масса шара 1, m₁" value={String(m1)} onChange={(v) => setM1(+v)} options={MASS_OPTS} />
-              <Select label="Масса шара 2, m₂" value={String(m2)} onChange={(v) => setM2(+v)} options={MASS_OPTS} />
-              <Readout label="Начальный угол α₁" value={fmt(a1, 0)} unit="°" />
-              <div className="small dim" style={{ marginTop: 4 }}>
-                Массы выбираются из набора методики: 112 г (тяжёлый) и 40 г (лёгкий). Опыты
-                проводят как с <b>равными</b> шарами (m₁ = m₂), так и с <b>разными</b> (112 г и 40 г);
-                α₁ = 10°, l = {fmt(L, 2)} м.
-              </div>
-            </>
-          ) : (
-            <>
-              <Slider label="Масса шара 1, m₁" value={m1} onChange={setM1} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
-              <Slider label="Масса шара 2, m₂" value={m2} onChange={setM2} min={0.05} max={0.5} step={0.01} unit="кг" digits={2} />
-              <Slider label="Начальный угол α₁" value={a1} onChange={setA1} min={15} max={70} step={1} unit="°" digits={0} />
-              <div className="small dim" style={{ marginTop: 4 }}>
-                Длина маятников l = {fmt(L, 2)} м. При m₁ &lt; m₂ первый шар после упругого удара
-                отскакивает назад.
-              </div>
-            </>
-          )}
+          <h5>Параметры установки</h5>
+          <Select label="Радиус шкива r" value={r} onChange={(v) => setR(+v)} options={R_OPTS} />
+          <Slider label="Высота падения h" value={h} onChange={setH} min={0.8} max={2} step={0.05} unit="м" digits={2} />
+          <Slider label="Масса груза m" value={m} onChange={setM} min={0.1} max={0.5} step={0.01} unit="кг" digits={2} />
         </div>
         <div className="ctrl-card">
           <h5>Управление</h5>
           <div className="btn-row">
-            <Btn onClick={prepare} disabled={phase === 'fly' || phase === 'post'}>
+            <Btn onClick={prepare} disabled={phase === 'fall' || phase === 'spin' || phase === 'rebound'}>
               Подготовить
             </Btn>
             <Btn onClick={start} disabled={phase !== 'ready'}>
-              Пуск
+              Старт
             </Btn>
+          </div>
+          <Slider label="Скорость анимации" value={speed} onChange={setSpeed} min={1} max={10} step={1} unit="×" digits={0} />
+          <div className="small dim" style={{ marginTop: 6 }}>
+            Скорость влияет только на ход модели по времени, измеряемые значения соответствуют
+            реальному времени процесса.
           </div>
         </div>
         <div className="ctrl-card">
           <h5>Измеряемые величины</h5>
           <div className="readouts">
-            {mode === 'elastic' ? (
-              <>
-                <Readout label="α₁' (после удара)" value={elastRows.length ? fmt(elastRows[elastRows.length - 1].a1p, 1) : '—'} unit="°" hl />
-                <Readout label="α₂' (после удара)" value={elastRows.length ? fmt(elastRows[elastRows.length - 1].a2p, 1) : '—'} unit="°" hl />
-              </>
+            <Readout label="t — время падения" value={last ? fmt(last.t, 2) : '—'} unit="с" hl />
+            {isPrint ? (
+              <Readout label="h₁ — высота подъёма" value={last ? fmt(last.h1, 3) : '—'} unit="м" />
             ) : (
-              <Readout label="α' (сцепившихся шаров)" value={inelRows.length ? fmt(inelRows[inelRows.length - 1].ap, 1) : '—'} unit="°" hl />
+              <>
+                <Readout label="n₁ — оборотов при падении" value={last ? fmt(last.n1, 1) : '—'} unit="об" />
+                <Readout label="n₂ — оборотов до остановки" value={last ? fmt(last.n2, 1) : '—'} unit="об" />
+              </>
             )}
           </div>
           {rows.length > 0 && (
             <div className="btn-row">
               <Btn variant="danger" onClick={onClear}>
-                Очистить таблицы
+                Очистить таблицу
               </Btn>
             </div>
           )}
@@ -299,149 +233,126 @@ export default function Lab2Sim({ rows, onResult, onClear, version = 'web' }) {
       </div>
     </div>
   )
+}
 
-  function draw(ctx, s) {
-    bg(ctx)
-    const R1 = ballR(s.p?.m1 ?? m1)
-    const R2 = ballR(s.p?.m2 ?? m2)
-    const q1x = CX - (R1 + R2) / 2 - 1
-    const q2x = CX + (R1 + R2) / 2 + 1
+function draw(ctx, s, version) {
+  bg(ctx)
+  const cx = 235
+  const cy = 168
+  const Rf = 106
+  const Rp = 38
+  const isPrint = version === 'print'
 
-    ctx.fillStyle = '#77839d'
-    ctx.fillRect(CX - 230, PIVY - 12, 460, 10)
-    for (let x = CX - 225; x < CX + 225; x += 26) {
-      line(ctx, x, PIVY - 2, x - 8, PIVY - 14, '#9aa7bd', 1.4)
-    }
+  ctx.fillStyle = '#e7ebf2'
+  ctx.fillRect(0, 436, 780, 34)
+  line(ctx, 0, 436, 780, 436, '#9aa7bd', 2)
 
-    for (const [px, base] of [
-      [q1x, -75],
-      [q2x, -75],
-    ]) {
-      ctx.strokeStyle = 'rgba(120,134,164,0.35)'
-      ctx.lineWidth = 1
-      for (let a = base; a <= 75; a += 15) {
-        const aa = rad(a)
-        const x1 = px + (Lpx - 6) * Math.sin(aa)
-        const y1 = PIVY + (Lpx - 6) * Math.cos(aa)
-        const x2 = px + (Lpx + 6) * Math.sin(aa)
-        const y2 = PIVY + (Lpx + 6) * Math.cos(aa)
-        ctx.beginPath()
-        ctx.moveTo(x1, y1)
-        ctx.lineTo(x2, y2)
-        ctx.stroke()
-        if (px === q2x) {
-          label(ctx, `${a}`, px + (Lpx + 20) * Math.sin(aa) - 8, PIVY + (Lpx + 20) * Math.cos(aa) + 4, 10, '#8a94ab')
-        }
-      }
-    }
+  ctx.strokeStyle = '#90a0bb'
+  ctx.lineWidth = 9
+  ctx.beginPath()
+  ctx.moveTo(cx - 52, cy + 24)
+  ctx.lineTo(cx - 84, 432)
+  ctx.moveTo(cx + 52, cy + 24)
+  ctx.lineTo(cx + 84, 432)
+  ctx.stroke()
 
-    const aMag = rad(s.p?.a1 ?? a1)
-    const magX = q1x + (Lpx - ballR(s.p?.m1 ?? m1) - 14) * Math.sin(-aMag)
-    const magY = PIVY + (Lpx - ballR(s.p?.m1 ?? m1) - 14) * Math.cos(-aMag)
-    const magOn = s.phase === 'idle' || s.phase === 'ready'
-    ctx.save()
-    ctx.translate(magX, magY)
-    ctx.rotate(-aMag)
-    ctx.fillStyle = magOn ? '#b4533a' : '#8d99ae'
-    ctx.fillRect(-13, -20, 26, 22)
-    ctx.fillStyle = magOn ? '#e08a63' : '#c3ccd9'
-    ctx.fillRect(-13, -20, 26, 6)
-    ctx.restore()
-    label(ctx, 'электромагнит', magX - 40, magY - 26, 11, '#8a94ab')
-
-    const th1 = s.phase === 'idle' || s.phase === 'ready' ? -rad(s.p?.a1 ?? a1) : s.th1 || 0
-    const th2 = s.phase === 'idle' || s.phase === 'ready' ? 0 : s.th2 || 0
-
-    const b1x = q1x + Lpx * Math.sin(th1)
-    const b1y = PIVY + Lpx * Math.cos(th1)
-    const b2x = q2x + Lpx * Math.sin(th2)
-    const b2y = PIVY + Lpx * Math.cos(th2)
-
-    line(ctx, q1x, PIVY, b1x, b1y, '#444c63', 1.6)
-    line(ctx, q2x, PIVY, b2x, b2y, '#444c63', 1.6)
-
-    ball(ctx, b2x, b2y, R2, { light: '#b9c8d8', dark: '#6d8399' })
-    label(ctx, '2', b2x + R2 + 4, b2y - R2 + 2, 13, '#44506b')
-    ball(ctx, b1x, b1y, R1, { light: '#c9c2b4', dark: '#77705e' })
-    label(ctx, '1', b1x - R1 - 12, b1y - R1 + 2, 13, '#44506b')
-
-    ctx.fillStyle = '#5b6c8f'
+  const th = s.theta || 0
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(th)
+  ctx.strokeStyle = '#7c8db0'
+  ctx.lineWidth = 11
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3
     ctx.beginPath()
-    ctx.arc(q1x, PIVY, 4, 0, Math.PI * 2)
-    ctx.arc(q2x, PIVY, 4, 0, Math.PI * 2)
-    ctx.fill()
+    ctx.moveTo(Math.cos(a) * 18, Math.sin(a) * 18)
+    ctx.lineTo(Math.cos(a) * 96, Math.sin(a) * 96)
+    ctx.stroke()
+  }
+  ctx.strokeStyle = '#5b6c8f'
+  ctx.lineWidth = 15
+  ctx.beginPath()
+  ctx.arc(0, 0, Rf - 4, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = '#48597c'
+  ctx.lineWidth = 4
+  ctx.beginPath()
+  ctx.arc(0, 0, Rf + 4, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.fillStyle = '#e05252'
+  ctx.beginPath()
+  ctx.arc(0, Rf - 4, 5, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
 
-    if (s.phase === 'post' || s.phase === 'done') {
-      ctx.save()
-      ctx.setLineDash([4, 4])
-      ctx.strokeStyle = 'rgba(180,83,9,0.45)'
-      ctx.lineWidth = 1
-      for (const px of [q1x, q2x]) {
-        ctx.beginPath()
-        ctx.moveTo(px, PIVY)
-        ctx.lineTo(px, PIVY + Lpx + 16)
-        ctx.stroke()
-      }
-      ctx.restore()
+  ctx.fillStyle = '#48597c'
+  ctx.beginPath()
+  ctx.arc(cx, cy, 16, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.fillStyle = '#aeb9cf'
+  ctx.beginPath()
+  ctx.arc(cx, cy, Rp, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#77839d'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(cx, cy, Rp, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.strokeStyle = '#8b95ac'
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  ctx.arc(cx, cy, Rp - 7, 0, Math.PI * 2)
+  ctx.stroke()
 
-      const arcR = 66
-      const drawArc = (px, th) => {
-        const a0 = Math.PI / 2
-        const a1 = Math.PI / 2 - th
-        ctx.strokeStyle = '#b45309'
-        ctx.lineWidth = 2.5
-        ctx.beginPath()
-        ctx.arc(px, PIVY, arcR, Math.min(a0, a1), Math.max(a0, a1))
-        ctx.stroke()
-        ctx.beginPath()
-        ctx.arc(px, PIVY, 2.5, 0, Math.PI * 2)
-        ctx.fillStyle = '#b45309'
-        ctx.fill()
-      }
+  label(ctx, 'А', cx - Rf - 16, cy - Rf + 10, 15, '#44506b')
+  label(ctx, 'В', cx + Rp + 10, cy + 6, 15, '#44506b')
 
-      const c1 = s.rec1 !== null ? s.rec1 : deg(s.th1)
-      const c2 = s.p.mode === 'elastic' ? (s.rec2 !== null ? s.rec2 : deg(s.th2)) : c1
-      drawArc(q1x, s.th1)
-      drawArc(q2x, s.th2)
+  const y0 = cy + Rp
+  const wTop0 = y0 + 8
+  const floorLineY = 436
+  const wH = 46
+  const drop = floorLineY - wH - wTop0
+  const hh = s.p?.h || 1.5
+  const xx = s.phase === 'idle' || s.phase === 'ready' ? 0 : s.x || 0
+  const wTop = Math.min(wTop0 + (xx / hh) * drop, floorLineY - wH)
 
-      const rayLen = Lpx + 24
-      ctx.save()
-      ctx.setLineDash([7, 4])
-      ctx.strokeStyle = '#b45309'
-      ctx.lineWidth = 2
-      for (const [px, c] of [
-        [q1x, c1],
-        [q2x, c2],
-      ]) {
-        const rr = rad(c)
-        ctx.beginPath()
-        ctx.moveTo(px, PIVY)
-        ctx.lineTo(px + rayLen * Math.sin(rr), PIVY + rayLen * Math.cos(rr))
-        ctx.stroke()
-      }
-      ctx.restore()
+  ctx.strokeStyle = '#6b5b45'
+  ctx.lineWidth = 2.2
+  ctx.beginPath()
+  ctx.moveTo(cx, y0)
+  if (!isPrint && (s.phase === 'spin' || s.phase === 'done')) {
+    ctx.quadraticCurveTo(cx + 30, (y0 + floorLineY) / 2, cx, floorLineY - wH)
+  } else {
+    ctx.lineTo(cx, wTop)
+  }
+  ctx.stroke()
 
-      if (s.p.mode === 'elastic') {
-        label(ctx, `α₁' = ${fmt(c1, 1)}°`, q1x - 96, PIVY + Lpx + 8, 13, '#b45309')
-        label(ctx, `α₂' = ${fmt(c2, 1)}°`, q2x + 6, PIVY + Lpx + 8, 13, '#b45309')
-      } else {
-        label(ctx, `α' = ${fmt(c1, 1)}°`, q1x - 80, PIVY + Lpx + 8, 13, '#b45309')
-      }
-    }
+  ctx.fillStyle = '#3f4f78'
+  ctx.fillRect(cx - 16, wTop, 32, 10)
+  const gh = 36
+  const gg = ctx.createLinearGradient(cx - 16, 0, cx + 16, 0)
+  gg.addColorStop(0, '#8e9a6f')
+  gg.addColorStop(1, '#5d6b45')
+  ctx.fillStyle = gg
+  ctx.fillRect(cx - 16, wTop + 10, 32, gh)
+  label(ctx, 'm', cx + 24, wTop + gh / 2 + 12, 14, '#44506b')
 
-    label(
-      ctx,
-      `m₁ = ${fmt(s.p?.m1 ?? m1, 2)} кг   m₂ = ${fmt(s.p?.m2 ?? m2, 2)} кг   α₁ = ${fmt(s.p?.a1 ?? a1, 0)}°   l = ${fmt(L, 2)} м`,
-      22,
-      30,
-      13.5,
-      '#44506b'
-    )
-    if (s.phase === 'fly') {
-      label(ctx, '⤓ шар 1 движется', 22, 52, 13, '#b45309')
-    }
-    if (s.post) {
-      label(ctx, s.p.mode === 'elastic' ? 'упругий удар' : 'неупругий удар (шары сцепились)', 22, 52, 13, '#b45309')
-    }
+  const rx = 480
+  line(ctx, rx, wTop0, rx, floorLineY - wH, '#9aa7bd', 2)
+  for (let i = 0; i <= 4; i++) {
+    const yy = wTop0 + (drop * i) / 4
+    line(ctx, rx - 6, yy, rx + 6, yy, '#9aa7bd', 2)
+    label(ctx, `${(i * 0.5).toFixed(1)}`, rx - 10, yy + 4, 11, '#77839d', 'right')
+  }
+  label(ctx, 'h, м', rx - 10, wTop0 - 8, 12, '#77839d', 'right')
+
+  label(ctx, `r = ${fmt(s.p?.r ?? 0.05, 2)} м   h = ${fmt(hh, 2)} м   m = ${fmt(s.p?.m ?? 0.2, 2)} кг`, 22, 30, 13.5, '#44506b')
+
+  if (s.phase === 'spin' || s.phase === 'fall' || s.phase === 'rebound') {
+    ctx.strokeStyle = '#d97706'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(cx, cy, Rf + 22, th % (2 * Math.PI) - 0.5, th % (2 * Math.PI) + 0.2)
+    ctx.stroke()
   }
 }
