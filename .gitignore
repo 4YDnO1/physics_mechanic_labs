@@ -9,6 +9,7 @@ dist
 *.temp
 ocr/
 labs_txt/
+promnt.exe
 
 # Тяжёлые исходники (хранятся локально, не отслеживаются)
 labs_docx/

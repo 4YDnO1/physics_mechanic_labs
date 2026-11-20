@@ -5,7 +5,45 @@ export const M0 = 0.2
 export const S1 = 0.3
 export const S2 = 0.5
 
-export function Theory() {
+export const PRINT_M = [0.01, 0.02, 0.03]
+export const PRINT_S = [0.3, 0.24, 0.15]
+
+export function Theory({ version }) {
+  if (version === 'print') {
+    return (
+      <>
+        <h3>Краткая теория</h3>
+        <p>
+          Машина Атвуда предназначена для исследования законов движения тел в поле силы тяжести:
+          она позволяет замедлить движение до удобных для измерений ускорений. Установка содержит
+          шкив, свободно вращающийся вокруг оси, и два груза массой <Tex>{String.raw`M`}</Tex>,
+          закреплённых на концах нити, переброшенной через шкив. Если с одной стороны добавить
+          небольшой груз массой <Tex>{String.raw`m`}</Tex>, система получает ускорение{' '}
+          <Tex>{String.raw`a`}</Tex> под действием силы <Tex>{String.raw`F = mg`}</Tex> и проходит
+          путь <Tex>{String.raw`S`}</Tex> за время <Tex>{String.raw`t`}</Tex>:
+        </p>
+        <Eq n={1}>{String.raw`S = \frac{at^2}{2}`}</Eq>
+        <p>Отсюда ускорение движения грузов:</p>
+        <Eq n={2}>{String.raw`a = \frac{2S}{t^2}`}</Eq>
+        <p>
+          Запишем второй закон Ньютона для левого груза массой <Tex>{String.raw`M`}</Tex> (движется
+          вверх) и для правых грузов массой <Tex>{String.raw`M + m`}</Tex> (движутся вниз):
+        </p>
+        <Eq n={3}>{String.raw`T - Mg = Ma,\qquad (M+m)g - T = (M+m)a`}</Eq>
+        <p>
+          где <Tex>{String.raw`T`}</Tex> — сила натяжения нити, <Tex>{String.raw`g`}</Tex> —
+          ускорение свободного падения. Почленное сложение уравнений исключает натяжение:
+        </p>
+        <Eq n={4}>{String.raw`mg = (2M+m)a \;\Rightarrow\; a = \frac{m}{2M+m}\,g`}</Eq>
+        <p>Подставляя (2) в (4), получаем рабочую формулу методички:</p>
+        <Eq n={5}>{String.raw`g = \frac{2S\,(2M+m)}{m\,t^2}`}</Eq>
+        <p>
+          Измеряя путь <Tex>{String.raw`S`}</Tex>, время <Tex>{String.raw`t`}</Tex> и массы грузов,
+          определяют ускорение свободного падения.
+        </p>
+      </>
+    )
+  }
   return (
     <>
       <h3>Содержание работы</h3>
@@ -58,7 +96,44 @@ export function Theory() {
   )
 }
 
-export function Procedure() {
+export function Procedure({ version }) {
+  if (version === 'print') {
+    return (
+      <ol className="steps">
+        <li>
+          Убедиться, что система из грузов и нити, перекинутой через блок, находится в положении
+          безразличного равновесия; при необходимости отрегулировать вертикальность стойки.
+        </li>
+        <li>
+          Перекинуть через шкив нить с основными грузами массой <Tex>{String.raw`M = ${fmt(M0, 1)}`}</Tex>{' '}
+          кг; включить электронный блок и установить фотодатчик в нижней части стойки.
+        </li>
+        <li>
+          Снять с левого груза разновес 10 г (перегрузок <Tex>{String.raw`m = 0{,}010`}</Tex> кг).
+          Отвести визир от фотодатчика на расстояние <Tex>{String.raw`S = 0{,}30`}</Tex> м.
+        </li>
+        <li>
+          Подвести нижнее основание правого груза к визиру, нажать «пуск» и занести показание
+          миллисекундомера — время <Tex>{String.raw`t`}</Tex> движения — в таблицу.
+        </li>
+        <li>Повторить пункты 3–4 ещё два раза для того же пути S.</li>
+        <li>
+          Повторить измерения для <Tex>{String.raw`S = 0{,}24`}</Tex> м и{' '}
+          <Tex>{String.raw`S = 0{,}15`}</Tex> м.
+        </li>
+        <li>
+          Повторить серию для разновесов 20 г и 30 г (<Tex>{String.raw`m = 0{,}020`}</Tex> и{' '}
+          <Tex>{String.raw`0{,}030`}</Tex> кг).
+        </li>
+        <li>
+          По формуле (2) рассчитать ускорение <Tex>{String.raw`a`}</Tex> для каждого опыта, затем
+          по формуле (5) — ускорение свободного падения <Tex>{String.raw`g`}</Tex> и среднее{' '}
+          <Tex>{String.raw`g_{\text{ср}}`}</Tex>.
+        </li>
+        <li>Сформулировать вывод и ответить на контрольные вопросы.</li>
+      </ol>
+    )
+  }
   return (
     <ol className="steps">
       <li>
@@ -96,15 +171,18 @@ export function Procedure() {
   )
 }
 
-export function Conclusions({ rows, stats }) {
+export function Conclusions({ version, rows, stats }) {
   const has = rows.length > 0
+  const isPrint = version === 'print'
   return (
     <>
       <h3>Вывод</h3>
       {has ? (
         <div className="conclusion-text">
           <p>
-            На машине Атвуда изучена динамика поступательного движения системы связанных тел.
+            {isPrint
+              ? 'На машине Атвуда по методике измерения времени прохождения заданного пути S определено ускорение свободного падения.'
+              : 'На машине Атвуда изучена динамика поступательного движения системы связанных тел.'}{' '}
             По результатам {rows.length} опытов среднее значение ускорения свободного падения
             составило <Tex>{String.raw`g_{\text{ср}} = ${fmt(stats.gm, 2)}`}</Tex> м/с², средняя
             абсолютная погрешность <Tex>{String.raw`\Delta g = ${fmt(stats.dg, 2)}`}</Tex> м/с²
@@ -125,75 +203,152 @@ export function Conclusions({ rows, stats }) {
 
       <h3>Контрольные вопросы</h3>
       <div className="qa">
-        <details>
-          <summary>1. Как записываются уравнения движения для левой и правых масс?</summary>
-          <div className="qa-body">
-            <p>
-              Для левого груза массой <Tex>{String.raw`M`}</Tex> (движется вверх с ускорением{' '}
-              <Tex>{String.raw`a`}</Tex>): <Tex>{String.raw`T - Mg = Ma`}</Tex>. Для правых грузов
-              массой <Tex>{String.raw`M + m`}</Tex> (движутся вниз):{' '}
-              <Tex>{String.raw`(M+m)g - T = (M+m)a`}</Tex>. Складывая эти уравнения, исключаем
-              натяжение нити: <Tex>{String.raw`mg = (2M+m)a`}</Tex>.
-            </p>
-          </div>
-        </details>
-        <details>
-          <summary>2. Почему движение на участке S₁ равноускоренное, а на участке S₂ равномерное?</summary>
-          <div className="qa-body">
-            <p>
-              На участке <Tex>{String.raw`S_1`}</Tex> на систему действует постоянная
-              результирующая внешняя сила — сила тяжести перегрузка{' '}
-              <Tex>{String.raw`mg`}</Tex> (массы блока и трением пренебрегаем), поэтому ускорение
-              постоянно и движение равноускоренное. На уловителе перегрузок отцепляется; после этого
-              суммарная сила тяжести грузов <Tex>{String.raw`2Mg`}</Tex> уравновешивается
-              натяжением нити, результирующая сила равна нулю, и по инерции система движется
-              равномерно с достигнутой скоростью <Tex>{String.raw`v_0`}</Tex>.
-            </p>
-          </div>
-        </details>
-        <details>
-          <summary>3. Как зависит ускорение масс a от значений масс m и M?</summary>
-          <div className="qa-body">
-            <p>
-              Из уравнения <Tex>{String.raw`mg = (2M + m)a`}</Tex> следует{' '}
-              <Tex>{String.raw`a = \dfrac{m}{2M+m}\,g`}</Tex>. Ускорение растёт с увеличением массы
-              перегрузка <Tex>{String.raw`m`}</Tex> и убывает с ростом массы основных грузов{' '}
-              <Tex>{String.raw`M`}</Tex>; при <Tex>{String.raw`m \ll M`}</Tex> приближённо{' '}
-              <Tex>{String.raw`a \approx \dfrac{m}{2M}g`}</Tex> — прямо пропорционально{' '}
-              <Tex>{String.raw`m`}</Tex>.
-            </p>
-          </div>
-        </details>
+        {isPrint ? (
+          <>
+            <details>
+              <summary>1. Принцип действия и устройство машины Атвуда. Какие силы действуют на движущиеся тела?</summary>
+              <div className="qa-body">
+                <p>
+                  Машина Атвуда — лёгкий шкив с нитью и двумя грузами; добавление небольшого груза{' '}
+                  <Tex>{String.raw`m`}</Tex> создаёт постоянную движущую силу <Tex>{String.raw`mg`}</Tex>,
+                  замедляя движение до измеримых ускорений. На грузы действуют сила тяжести и сила
+                  натяжения нити; на шкив — натяжение нити и реакция оси.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>2. Как записываются уравнения движений для левой и правых масс?</summary>
+              <div className="qa-body">
+                <p>
+                  Для левого груза массой <Tex>{String.raw`M`}</Tex> (вверх):{' '}
+                  <Tex>{String.raw`T - Mg = Ma`}</Tex>; для правых грузов массой{' '}
+                  <Tex>{String.raw`M + m`}</Tex> (вниз):{' '}
+                  <Tex>{String.raw`(M+m)g - T = (M+m)a`}</Tex>.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>3. Выведите соотношение (5), определяющее ускорение свободного падения.</summary>
+              <div className="qa-body">
+                <p>
+                  Из кинематики <Tex>{String.raw`S = at^2/2`}</Tex>, откуда{' '}
+                  <Tex>{String.raw`a = 2S/t^2`}</Tex>. Сложив уравнения Ньютона, получим{' '}
+                  <Tex>{String.raw`mg = (2M+m)a`}</Tex>, то есть{' '}
+                  <Tex>{String.raw`a = mg/(2M+m)`}</Tex>. Приравнивая выражения для ускорения:
+                </p>
+                <Eq>{String.raw`g = \frac{2S\,(2M+m)}{m\,t^2}`}</Eq>
+              </div>
+            </details>
+            <details>
+              <summary>4. Как зависит ускорение масс a от значений масс m и M?</summary>
+              <div className="qa-body">
+                <p>
+                  Из <Tex>{String.raw`a = \dfrac{m}{2M+m}\,g`}</Tex> следует: ускорение растёт с
+                  увеличением перегрузка <Tex>{String.raw`m`}</Tex> и убывает с ростом основных масс{' '}
+                  <Tex>{String.raw`M`}</Tex>; при <Tex>{String.raw`m \ll M`}</Tex> выполняется{' '}
+                  <Tex>{String.raw`a \approx \dfrac{m}{2M}g`}</Tex>.
+                </p>
+              </div>
+            </details>
+          </>
+        ) : (
+          <>
+            <details>
+              <summary>1. Как записываются уравнения движения для левой и правых масс?</summary>
+              <div className="qa-body">
+                <p>
+                  Для левого груза массой <Tex>{String.raw`M`}</Tex> (движется вверх с ускорением{' '}
+                  <Tex>{String.raw`a`}</Tex>): <Tex>{String.raw`T - Mg = Ma`}</Tex>. Для правых грузов
+                  массой <Tex>{String.raw`M + m`}</Tex> (движутся вниз):{' '}
+                  <Tex>{String.raw`(M+m)g - T = (M+m)a`}</Tex>. Складывая эти уравнения, исключаем
+                  натяжение нити: <Tex>{String.raw`mg = (2M+m)a`}</Tex>.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>2. Почему движение на участке S₁ равноускоренное, а на участке S₂ равномерное?</summary>
+              <div className="qa-body">
+                <p>
+                  На участке <Tex>{String.raw`S_1`}</Tex> на систему действует постоянная
+                  результирующая внешняя сила — сила тяжести перегрузка{' '}
+                  <Tex>{String.raw`mg`}</Tex> (массы блока и трением пренебрегаем), поэтому ускорение
+                  постоянно и движение равноускоренное. На уловителе перегрузок отцепляется; после этого
+                  суммарная сила тяжести грузов <Tex>{String.raw`2Mg`}</Tex> уравновешивается
+                  натяжением нити, результирующая сила равна нулю, и по инерции система движется
+                  равномерно с достигнутой скоростью <Tex>{String.raw`v_0`}</Tex>.
+                </p>
+              </div>
+            </details>
+            <details>
+              <summary>3. Как зависит ускорение масс a от значений масс m и M?</summary>
+              <div className="qa-body">
+                <p>
+                  Из уравнения <Tex>{String.raw`mg = (2M + m)a`}</Tex> следует{' '}
+                  <Tex>{String.raw`a = \dfrac{m}{2M+m}\,g`}</Tex>. Ускорение растёт с увеличением массы
+                  перегрузка <Tex>{String.raw`m`}</Tex> и убывает с ростом массы основных грузов{' '}
+                  <Tex>{String.raw`M`}</Tex>; при <Tex>{String.raw`m \ll M`}</Tex> приближённо{' '}
+                  <Tex>{String.raw`a \approx \dfrac{m}{2M}g`}</Tex> — прямо пропорционально{' '}
+                  <Tex>{String.raw`m`}</Tex>.
+                </p>
+              </div>
+            </details>
+          </>
+        )}
       </div>
 
       <h3>Преобразование формул (вывод рабочей формулы)</h3>
       <div className="qa">
         <details open>
-          <summary>Вывод формулы (10)</summary>
+          <summary>{isPrint ? 'Вывод формулы (5)' : 'Вывод формулы (10)'}</summary>
           <div className="qa-body">
-            <p>
-              <b>Шаг 1.</b> Равноускоренное движение на участке <Tex>{String.raw`S_1`}</Tex> без
-              начальной скорости: <Tex>{String.raw`S_1 = \dfrac{at_1^2}{2}`}</Tex> (1), поэтому{' '}
-              <Tex>{String.raw`t_1 = \sqrt{\dfrac{2S_1}{a}}`}</Tex>.
-            </p>
-            <p>
-              <b>Шаг 2.</b> Скорость в конце участка <Tex>{String.raw`v_0 = at_1`}</Tex> (3);
-              равномерное движение на участке <Tex>{String.raw`S_2`}</Tex> за время{' '}
-              <Tex>{String.raw`t`}</Tex>: <Tex>{String.raw`S_2 = v_0t = at_1t = t\sqrt{2aS_1}`}</Tex>.
-            </p>
-            <p>
-              <b>Шаг 3.</b> Возведём в квадрат и выразим ускорение:
-            </p>
-            <Eq>{String.raw`S_2^2 = 2aS_1t^2 \;\Rightarrow\; a = \frac{S_2^2}{2S_1t^2} \qquad (6)`}</Eq>
-            <p>
-              <b>Шаг 4.</b> Второй закон Ньютона для обоих грузов (7), (8); почленное сложение
-              исключает натяжение <Tex>{String.raw`T`}</Tex>:
-            </p>
-            <Eq>{String.raw`T - Mg + (m+M)g - T = Ma + (m+M)a \;\Rightarrow\; mg = (2M+m)a \qquad (9)`}</Eq>
-            <p>
-              <b>Шаг 5.</b> Выражаем <Tex>{String.raw`g = \dfrac{(2M+m)a}{m}`}</Tex> и подставляем (6):
-            </p>
-            <Eq n={10}>{String.raw`g = \frac{S_2^2\,(2M+m)}{2S_1t^2m}`}</Eq>
+            {isPrint ? (
+              <>
+                <p>
+                  <b>Шаг 1.</b> Равноускоренное движение из состояния покоя:{' '}
+                  <Tex>{String.raw`S = \dfrac{at^2}{2}`}</Tex> (1), откуда{' '}
+                  <Tex>{String.raw`a = \dfrac{2S}{t^2}`}</Tex> (2).
+                </p>
+                <p>
+                  <b>Шаг 2.</b> Уравнения Ньютона для грузов (3):{' '}
+                  <Tex>{String.raw`T - Mg = Ma`}</Tex> и{' '}
+                  <Tex>{String.raw`(M+m)g - T = (M+m)a`}</Tex>.
+                </p>
+                <p>
+                  <b>Шаг 3.</b> Складываем уравнения и исключаем натяжение:
+                </p>
+                <Eq>{String.raw`mg = (2M+m)a \;\Rightarrow\; a = \frac{m}{2M+m}\,g \qquad (4)`}</Eq>
+                <p>
+                  <b>Шаг 4.</b> Приравниваем выражения для ускорения (2) и (4):
+                </p>
+                <Eq n={5}>{String.raw`g = \frac{2S\,(2M+m)}{m\,t^2}`}</Eq>
+              </>
+            ) : (
+              <>
+                <p>
+                  <b>Шаг 1.</b> Равноускоренное движение на участке <Tex>{String.raw`S_1`}</Tex> без
+                  начальной скорости: <Tex>{String.raw`S_1 = \dfrac{at_1^2}{2}`}</Tex> (1), поэтому{' '}
+                  <Tex>{String.raw`t_1 = \sqrt{\dfrac{2S_1}{a}}`}</Tex>.
+                </p>
+                <p>
+                  <b>Шаг 2.</b> Скорость в конце участка <Tex>{String.raw`v_0 = at_1`}</Tex> (3);
+                  равномерное движение на участке <Tex>{String.raw`S_2`}</Tex> за время{' '}
+                  <Tex>{String.raw`t`}</Tex>: <Tex>{String.raw`S_2 = v_0t = at_1t = t\sqrt{2aS_1}`}</Tex>.
+                </p>
+                <p>
+                  <b>Шаг 3.</b> Возведём в квадрат и выразим ускорение:
+                </p>
+                <Eq>{String.raw`S_2^2 = 2aS_1t^2 \;\Rightarrow\; a = \frac{S_2^2}{2S_1t^2} \qquad (6)`}</Eq>
+                <p>
+                  <b>Шаг 4.</b> Второй закон Ньютона для обоих грузов (7), (8); почленное сложение
+                  исключает натяжение <Tex>{String.raw`T`}</Tex>:
+                </p>
+                <Eq>{String.raw`T - Mg + (m+M)g - T = Ma + (m+M)a \;\Rightarrow\; mg = (2M+m)a \qquad (9)`}</Eq>
+                <p>
+                  <b>Шаг 5.</b> Выражаем <Tex>{String.raw`g = \dfrac{(2M+m)a}{m}`}</Tex> и подставляем (6):
+                </p>
+                <Eq n={10}>{String.raw`g = \frac{S_2^2\,(2M+m)}{2S_1t^2m}`}</Eq>
+              </>
+            )}
           </div>
         </details>
       </div>

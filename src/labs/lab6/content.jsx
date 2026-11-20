@@ -5,9 +5,15 @@ export const DH = 0.0005
 export const DR = 0.0001
 export const DT_INSTR = 0.005
 
-export function Theory() {
+export function Theory({ version }) {
   return (
     <>
+      {version === 'print' && (
+        <p className="note">
+          Очная методичка КНИТУ-КАИ, лабораторная работа №1: «Определение кинематических
+          параметров равнопеременного движения груза».
+        </p>
+      )}
       <h3>Кинематика равнопеременного движения</h3>
       <p>
         Если тело, поднятое на высоту <Tex>{String.raw`h`}</Tex>, движется поступательно вниз без
@@ -90,7 +96,45 @@ export function Theory() {
   )
 }
 
-export function Procedure() {
+export function Procedure({ version }) {
+  if (version === 'print') {
+    return (
+      <ol className="steps">
+        <li>
+          Удерживая маховик, намотать нить на свободную ось (шкив) и поднять груз, участвующий в
+          поступательном движении. Отпустить маховик.
+        </li>
+        <li>
+          Измерить высоту <Tex>{String.raw`h`}</Tex> от нижней плоскости установки до нижней плоскости
+          груза в точке его падения и занести значение в таблицу 1.
+        </li>
+        <li>
+          Заново поднять груз на высоту <Tex>{String.raw`h`}</Tex>, освободить его и измерить время{' '}
+          <Tex>{String.raw`t`}</Tex> прохождения заданной высоты.
+        </li>
+        <li>
+          Повторить пункты 2–3 ещё четыре раза при той же высоте <Tex>{String.raw`h`}</Tex> (всего{' '}
+          <b>5 измерений</b>).
+        </li>
+        <li>Записать погрешность секундомера <Tex>{String.raw`\Delta t_{\text{приб}}`}</Tex> в таблицу 2.</li>
+        <li>
+          Измерить штангенциркулем радиус шкива (оси) <Tex>{String.raw`R`}</Tex>, на который
+          наматывается нить.
+        </li>
+        <li>
+          Найти среднее время, абсолютные погрешности измерений, квадраты отклонений,
+          среднеквадратичную ошибку и коэффициент Стьюдента для доверительной вероятности{' '}
+          <Tex>{String.raw`\alpha = 0{,}95`}</Tex>.
+        </li>
+        <li>
+          По формулам (2)–(7) вычислить кинематические характеристики{' '}
+          <Tex>{String.raw`a,\ v,\ \omega,\ \varepsilon,\ a_{\tau},\ a_n,\ a_0`}</Tex> и их
+          погрешности по формулам (14)–(17); результаты занести в таблицу 3.
+        </li>
+        <li>Окончательный результат записать в виде <Tex>{String.raw`X = \bar X \pm \Delta X`}</Tex> и сделать вывод.</li>
+      </ol>
+    )
+  }
   return (
     <ol className="steps">
       <li>
@@ -129,8 +173,9 @@ export function Procedure() {
   )
 }
 
-export function Conclusions({ rows, stats }) {
+export function Conclusions({ version, rows, stats }) {
   const has = rows.length > 0 && Number.isFinite(stats.tMean)
+  const isPrint = version === 'print'
   return (
     <>
       <h3>Вывод</h3>
@@ -163,7 +208,7 @@ export function Conclusions({ rows, stats }) {
         <div className="tbl-empty">Выполните измерения на вкладке «Эксперимент» — вывод будет сформирован автоматически.</div>
       )}
 
-      <h3>Контрольные вопросы</h3>
+      <h3>{isPrint ? 'Контрольные вопросы (очная методичка)' : 'Контрольные вопросы'}</h3>
       <div className="qa">
         <details>
           <summary>1. Дайте определение материальной точки.</summary>
@@ -202,18 +247,20 @@ export function Conclusions({ rows, stats }) {
             </p>
           </div>
         </details>
-        <details>
-          <summary>4. В чём отличие нормального и тангенциального ускорения?</summary>
-          <div className="qa-body">
-            <p>
-              Тангенциальное ускорение <Tex>{String.raw`a_{\tau}`}</Tex> направлено по касательной к
-              траектории и изменяет модуль скорости. Нормальное (центростремительное) ускорение{' '}
-              <Tex>{String.raw`a_n = v^2/R`}</Tex> направлено к центру кривизны и изменяет
-              направление скорости. Полное ускорение{' '}
-              <Tex>{String.raw`a_0 = \sqrt{a_{\tau}^2 + a_n^2}`}</Tex>.
-            </p>
-          </div>
-        </details>
+        {!isPrint && (
+          <details>
+            <summary>4. В чём отличие нормального и тангенциального ускорения?</summary>
+            <div className="qa-body">
+              <p>
+                Тангенциальное ускорение <Tex>{String.raw`a_{\tau}`}</Tex> направлено по касательной к
+                траектории и изменяет модуль скорости. Нормальное (центростремительное) ускорение{' '}
+                <Tex>{String.raw`a_n = v^2/R`}</Tex> направлено к центру кривизны и изменяет
+                направление скорости. Полное ускорение{' '}
+                <Tex>{String.raw`a_0 = \sqrt{a_{\tau}^2 + a_n^2}`}</Tex>.
+              </p>
+            </div>
+          </details>
+        )}
       </div>
     </>
   )

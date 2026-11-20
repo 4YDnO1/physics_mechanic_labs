@@ -35,6 +35,7 @@ const rows2p = [
 ]
 const rows3 = n({ m: 0.1, t: 4.5, r: 0.03, R: 0.1, h: 1.0, Jz: 0.0244 })
 const rows4 = n({ m: 0.01, M: 0.2, S1: 0.3, S2: 0.5, t: 1.32 })
+const rows4p = n({ m: 0.01, M: 0.2, S: 0.3, t: 0.79 })
 const rows5 = [
   ...n(3, { vessel: 1, name: 'Сталь', rhoS: 7860, rhoL: 1250, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
   ...n(3, { vessel: 1, name: 'Медь', rhoS: 8930, rhoL: 1250, r: 0.002, h: 0.1, l: 0.35, t: 5.1 }),
@@ -63,15 +64,18 @@ const checks = [
   ['Лаб2 теория+порядок (печатн.)', <><T2 version="print" /><P2 version="print" /></>],
   ['Лаб3 теория+порядок', <><T3 /><P3 /></>],
   ['Лаб4 теория+порядок', <><T4 /><P4 /></>],
+  ['Лаб4 теория+порядок (печатн.)', <><T4 version="print" /><P4 version="print" /></>],
   ['Лаб5 теория+порядок', <><T5 /><P5 /></>],
   ['Лаб5 теория+порядок (печатн.)', <><T5 version="print" /><P5 version="print" /></>],
   ['Лаб6 теория+порядок', <><T6 /><P6 /></>],
+  ['Лаб6 теория+порядок (печатн.)', <><T6 version="print" /><P6 version="print" /></>],
   ['Лаб1 расчёты', <Calc1 rows={rows1} />],
   ['Лаб1 расчёты (печатн.)', <Calc1 version="print" rows={rows1p} />],
   ['Лаб2 расчёты', <Calc2 rows={rows2} />],
   ['Лаб2 расчёты (печатн.)', <Calc2 version="print" rows={rows2p} />],
   ['Лаб3 расчёты', <Calc3 rows={rows3} />],
   ['Лаб4 расчёты', <Calc4 rows={rows4} />],
+  ['Лаб4 расчёты (печатн.)', <Calc4 version="print" rows={rows4p} />],
   ['Лаб5 расчёты', <Calc5 rows={rows5} />],
   ['Лаб5 расчёты (печатн.)', <Calc5 version="print" rows={rows5} />],
   ['Лаб6 расчёты', <Calc6 rows={rows6} />],
@@ -81,9 +85,11 @@ const checks = [
   ['Лаб2 выводы (печатн.)', <C2 version="print" rows={rows2p} stats={cs2(rows2p, 'print')} />],
   ['Лаб3 выводы', <C3 rows={rows3} stats={cs3(rows3)} />],
   ['Лаб4 выводы', <C4 rows={rows4} stats={cs4(rows4)} />],
+  ['Лаб4 выводы (печатн.)', <C4 version="print" rows={rows4p} stats={cs4(rows4p, 'print')} />],
   ['Лаб5 выводы', <C5 rows={rows5} stats={cs5(rows5).byLiq} />],
   ['Лаб5 выводы (печатн.)', <C5 version="print" rows={rows5} stats={cs5(rows5, 'print').byLiq} />],
   ['Лаб6 выводы', <C6 rows={rows6} stats={cs6(rows6)} />],
+  ['Лаб6 выводы (печатн.)', <C6 version="print" rows={rows6} stats={cs6(rows6)} />],
 ]
 
 export function run() {
